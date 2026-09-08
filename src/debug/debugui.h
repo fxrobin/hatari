@@ -34,6 +34,14 @@ typedef enum {
 #define MAX_DEBUG_CMD_LEN 4096
 
 extern void DebugUI_Init(void);
+
+/* Hook called instead of the interactive prompt when emulation stops
+ * (breakpoint, steps, exception...). If it returns true, DebugUI()
+ * returns immediately without entering the readline loop. Used by
+ * the libretro debug API to hand control back to the host. */
+typedef bool (*DebugUI_StopHook)(debug_reason_t reason);
+extern void DebugUI_SetStopHook(DebugUI_StopHook hook);
+
 extern void DebugUI(debug_reason_t reason);
 extern void DebugUI_Exceptions(int nr, long pc);
 extern bool DebugUI_ParseLine(const char *input);

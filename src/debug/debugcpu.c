@@ -1175,6 +1175,16 @@ static int DebugCpu_MemFind(int nArgc, char *psArgs[])
 
 
 /**
+ * Arm single-stepping for given number of instructions, after which
+ * DebugUI() is called with REASON_CPU_STEPS. Zero disables stepping.
+ * Caller must invoke DebugCpu_SetDebugging() afterwards.
+ */
+void DebugCpu_SetSteps(int steps)
+{
+	nCpuSteps = steps > 0 ? steps : 0;
+}
+
+/**
  * Command: Continue CPU emulation / single-stepping
  */
 static int DebugCpu_Continue(int nArgc, char *psArgv[])

@@ -1299,6 +1299,17 @@ bool DebugUI_AddParseFile(const char *path)
 }
 
 
+static DebugUI_StopHook stopHook;
+
+/**
+ * Set (or clear with NULL) the hook called when emulation stops.
+ */
+void DebugUI_SetStopHook(DebugUI_StopHook hook)
+{
+	stopHook = hook;
+}
+
+
 /**
  * Debugger user interface main function.
  */
@@ -1310,6 +1321,9 @@ void DebugUI(debug_reason_t reason)
 		"\n----------------------------------------------------------------------"
 		"\nYou have entered debug mode. Type c to continue emulation, h for help.\n";
 	static bool recursing;
+
+	if (stopHook && stopHook(reason))
+		return;
 
 	if (recursing)
 	{
