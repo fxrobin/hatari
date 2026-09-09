@@ -16,6 +16,8 @@
         <mcp.sdk.version>2.0.0</mcp.sdk.version>
         <junit.version>5.10.2</junit.version>
         <exec.mainClass>fr.hatari.mcp.StdioMcpMain</exec.mainClass>
+        <hatari.core>${project.basedir}/../build/src/libretro-hatari.so</hatari.core>
+        <hatari.tos>${user.home}/.hatari/tos.img</hatari.tos>
     </properties>
 
     <dependencies>
@@ -46,6 +48,10 @@
                 <version>3.2.5</version>
                 <configuration>
                     <argLine>--enable-native-access=ALL-UNNAMED</argLine>
+                    <includes>
+                        <include>**/*Test.java</include>
+                        <include>**/*IT.java</include>
+                    </includes>
                     <systemPropertyVariables>
                         <hatari.core>${hatari.core}</hatari.core>
                         <hatari.tos>${hatari.tos}</hatari.tos>
