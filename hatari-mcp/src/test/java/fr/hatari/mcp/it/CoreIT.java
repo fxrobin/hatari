@@ -45,6 +45,7 @@ class CoreIT {
     }
 
     @Test
+    @Order(2)
     void memoryRoundTrip() {
         byte[] data = { 1, 2, 3, 4 };
         core.writeMemory(0x2000, data);
@@ -52,12 +53,14 @@ class CoreIT {
     }
 
     @Test
+    @Order(3)
     void registersAndRomPc() {
         Machine.Registers regs = core.registers();
         assertTrue(regs.pc() >= 0xE00000 && regs.pc() < 0xF00000, "PC hors ROM : " + Long.toHexString(regs.pc()));
     }
 
     @Test
+    @Order(4)
     void breakpointStopsRun() {
         long pc = core.registers().pc();
         core.run(1);
@@ -66,28 +69,38 @@ class CoreIT {
         assertTrue(out.contains("breakpoint"), out);
         Machine.RunResult r = core.run(500);
         assertEquals(Machine.StopReason.BREAKPOINT, r.reason(), "pc initial " + Long.toHexString(pc));
-        // Hatari rend la main a la fin de l'instruction ou le point d'arret a matche :
-        // le PC est donc soit sur la cible, soit sur l'instruction suivante.
-        long after = core.registers().pc();
-        assertTrue(after == target || after == nextPc(target),
-                "pc apres arret : " + Long.toHexString(after) + ", cible " + Long.toHexString(target));
+        assertEquals(target, core.registers().pc());
     }
 
+    /**
+     * Pas-a-pas depuis une sequence connue : 4 NOPs suivis d'un "bra.s" de retour,
+     * comme tests/retro/test-debug-api.c. Apres 3 pas le PC doit etre sur le 4e NOP.
+     * Les interruptions sont masquees (SR IPL = 7) ; ce test detourne le PC vers
+     * la RAM, il s'execute donc en dernier.
+     */
     @Test
+    @Order(200)
     void stepStopsAfterInstructions() {
-        core.step(5);
+        core.writeMemory(0x2100, new byte[] {
+            0x4E, 0x71, 0x4E, 0x71, 0x4E, 0x71, 0x4E, 0x71, 0x60, (byte) 0xF6
+        });
+        core.setRegister("SR", 0x2700);
+        core.setRegister("PC", 0x2100);
+        core.step(3);
         Machine.RunResult r = core.run(10);
         assertEquals(Machine.StopReason.STEPS, r.reason());
+        assertEquals(0x2106, core.registers().pc());
     }
 
     @Test
+    @Order(5)
     void disassembleReturnsText() {
         String txt = core.disassemble((int) core.registers().pc(), 4);
         assertFalse(txt.isBlank());
     }
 
     @Test
-    @Order(100)
+    @Order(6)
     void countersAdvanceWithRun() {
         long vbl = core.vblCount(), cycles = core.cycleCount();
         Machine.RunResult r = core.run(10);
@@ -96,10 +109,4 @@ class CoreIT {
         assertTrue(core.cycleCount() > cycles);
     }
 
-    /** Adresse de l'instruction suivant {@code addr}, lue sur la 2e ligne du desassemblage. */
-    private static long nextPc(long addr) {
-        String[] lines = core.disassemble((int) addr, 2).split("\n");
-        assertTrue(lines.length >= 2, "desassemblage trop court");
-        return Long.parseLong(lines[1].split("\\s+")[0], 16);
-    }
 }
