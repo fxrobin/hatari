@@ -83,3 +83,12 @@ Contrôle externe : `--control-socket` / `--cmd-fifo` (`control.c`), utilisés p
 - `src/gemdos.c` : émulation GEMDOS HD (répertoire hôte monté), `hdc.c`/`ncr5380.c`/`ide.c` : ACSI/SCSI/IDE.
 - `src/convert/` : routines de conversion ST-screen → surface hôte, incluses par `conv_st.c` selon résolution.
 - `tools/` : `hmsa` (conversion ST/MSA), `gst2ascii`, `hatari_profile.py`, `hatari-prg-args.sh` (lancer un `.prg` avec args, pratique pour les tests), scripts image HD.
+
+## hatari-mcp (branche `mcp`)
+
+Serveur MCP stdio Java (`hatari-mcp/`, JDK 25, FFM) qui charge `build/src/libretro-hatari.so`. Les exports `hatari_*` vivent dans `src/retro/debug_api.c` ; le hook `DebugUI_SetStopHook` remplace le REPL readline quand un breakpoint tombe.
+
+- Build du cœur : `cmake -DENABLE_LIBRETRO=1 -DLIBRETRO_INCLUDE_DIR=$PWD/../hatari-mcp/native/include ..` puis `cmake --build .` ; test C : `ctest -R debug-api -V`.
+- Java : `export JAVA_HOME=~/.sdkman/candidates/java/25.0.4-tem` puis `cd hatari-mcp && mvn test` (les tests `*IT` utilisent la vraie `.so` et `~/.hatari/tos.img`, ignorés si absents).
+- Lancement : `hatari-mcp/scripts/hatari-mcp.sh` (déclaré dans `.mcp.json`). Smoke : `hatari-mcp/scripts/smoke.sh`.
+- Spec et plan : `docs/superpowers/specs/2026-09-08-hatari-mcp-design.md`, `docs/superpowers/plans/2026-09-08-hatari-mcp.md`.
