@@ -53,7 +53,7 @@ public final class MemoryTools {
         return tools.tool("write_memory",
                 "Écrit une liste d'octets hex (\"DE\",\"AD\") à l'adresse hex donnée.",
                 "{\"type\":\"object\",\"required\":[\"addr\",\"bytes\"],\"properties\":{"
-                        + "\"addr\":{\"type\":\"string\"},\"bytes\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}}}",
+                        + "\"addr\":{\"type\":\"string\"},\"bytes\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1}}}",
                 args -> {
                     int addr = args.hex("addr");
                     List<Integer> list = args.byteList("bytes");

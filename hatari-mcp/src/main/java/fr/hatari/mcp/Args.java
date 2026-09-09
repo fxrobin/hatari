@@ -106,9 +106,19 @@ public final class Args {
         if (!(v instanceof List<?> list)) {
             throw new IllegalArgumentException(key + " doit être un tableau");
         }
+        if (list.isEmpty()) {
+            throw new IllegalArgumentException(key + " ne peut pas être vide");
+        }
         List<Integer> out = new ArrayList<>(list.size());
         // Éléments hex par convention (octets/scancodes 68000) : "12" → $12.
-        for (Object o : list) out.add(hexValue(o, key) & 0xFF);
+        for (int i = 0; i < list.size(); i++) {
+            Object o = list.get(i);
+            int val = hexValue(o, key);
+            if (val < 0 || val > 0xFF) {
+                throw new IllegalArgumentException(key + "[" + i + "]: valeur octet invalide " + String.format("0x%X", val & 0xFFFFFFFFL) + " (doit être 0x00-0xFF)");
+            }
+            out.add(val);
+        }
         return out;
     }
 

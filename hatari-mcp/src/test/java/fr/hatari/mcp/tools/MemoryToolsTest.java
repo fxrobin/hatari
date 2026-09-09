@@ -65,6 +65,45 @@ class MemoryToolsTest {
     }
 
     @Test
+    void writeMemoryRejectsOutOfRangeByteValue() {
+        for (SyncToolSpecification spec : catalog.all()) {
+            if (spec.tool().name().equals("write_memory")) {
+                CallToolResult r = spec.callHandler().apply(null, new CallToolRequest("write_memory", Map.of("addr", "3000", "bytes", List.of("1FF"))));
+                assertEquals(Boolean.TRUE, r.isError());
+                assertTrue(fake.calls.isEmpty(), "writeMemory should not be called");
+                return;
+            }
+        }
+        throw new AssertionError("outil absent : write_memory");
+    }
+
+    @Test
+    void writeMemoryRejectsEmptyList() {
+        for (SyncToolSpecification spec : catalog.all()) {
+            if (spec.tool().name().equals("write_memory")) {
+                CallToolResult r = spec.callHandler().apply(null, new CallToolRequest("write_memory", Map.of("addr", "3000", "bytes", List.of())));
+                assertEquals(Boolean.TRUE, r.isError());
+                assertTrue(fake.calls.isEmpty(), "writeMemory should not be called");
+                return;
+            }
+        }
+        throw new AssertionError("outil absent : write_memory");
+    }
+
+    @Test
+    void writeMemoryRejectsNegativeByteValue() {
+        for (SyncToolSpecification spec : catalog.all()) {
+            if (spec.tool().name().equals("write_memory")) {
+                CallToolResult r = spec.callHandler().apply(null, new CallToolRequest("write_memory", Map.of("addr", "3000", "bytes", List.of("-1"))));
+                assertEquals(Boolean.TRUE, r.isError());
+                assertTrue(fake.calls.isEmpty(), "writeMemory should not be called");
+                return;
+            }
+        }
+        throw new AssertionError("outil absent : write_memory");
+    }
+
+    @Test
     void readRegistersDecodesFlags() {
         fake.regs[17] = 0x2704;
         Map<String, Object> out = callTool("read_registers", Map.of());
