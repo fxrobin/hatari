@@ -163,12 +163,13 @@ int main(int argc, char *argv[])
 	/*
 	 * Breakpoint via debugger command, then run until it triggers.
 	 * BreakCond_Command() (src/debug/breakcond.c) reports what it did
-	 * with fprintf(stderr, ...) directly, not through debugOutput, so
-	 * 'out' stays empty here: hatari_dbg_command()'s return value and
-	 * the resulting breakpoint hit are what this checks.
+	 * with fprintf(stderr, ...) directly, not through debugOutput;
+	 * hatari_dbg_command() captures both, so 'out' still gets it.
 	 */
 	char out[4096];
 	CHECK(dbg("b pc = $1100", out, sizeof(out)) == 0);
+	printf("b: %s", out);
+	CHECK(strstr(out, "CPU condition breakpoint") != NULL);
 
 	CHECK(run(100, &reason, &done) == 0);
 	printf("bp: reason=%d done=%d\n", reason, done);
@@ -176,7 +177,10 @@ int main(int argc, char *argv[])
 	regs_get(r);
 	CHECK(r[16] == FAKE_TOS_LOOP);
 
-	/* remove it and check the next run() resumes normally */
+	/* list & remove; check the next run() resumes normally */
+	CHECK(dbg("b", out, sizeof(out)) == 0);
+	printf("b list: %s", out);
+	CHECK(strstr(out, "pc = $1100") != NULL);
 	CHECK(dbg("b 1", out, sizeof(out)) == 0);
 	CHECK(run(5, &reason, &done) == 0);
 	CHECK(reason == 0 && done == 5);

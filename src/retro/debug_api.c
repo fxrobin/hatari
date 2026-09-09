@@ -17,6 +17,7 @@ const char DebugApi_fileid[] = "Hatari debug_api.c";
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <unistd.h>
 
 #include "main.h"
 #include "configuration.h"
@@ -223,8 +224,21 @@ int hatari_step(int steps)
 
 /*-----------------------------------------------------------------------*/
 /**
- * Capture what a function writes to debugOutput into out[outlen].
- * Returns false if the memory stream could not be created.
+ * Capture what a function writes to debugOutput and to stderr (fd 2) into
+ * out[outlen] (memstream text first, then stderr text), truncated with a
+ * final '\0'. Most commands in src/debug (breakcond.c, symbols.c, ...)
+ * report through fprintf(stderr, ...) rather than debugOutput, so both
+ * streams have to be captured for hatari_dbg_command() to be useful.
+ *
+ * The fd 2 redirection is process-global (dup()/dup2() on STDERR_FILENO):
+ * by contract this function, like the rest of this API, must only ever be
+ * called from the single thread that drives retro_run(), never
+ * concurrently with itself or with other code writing to stderr.
+ *
+ * stderr capture is best-effort: if tmpfile()/dup()/dup2() fails, fn(arg)
+ * still runs and writes to the real stderr, and out only carries the
+ * debugOutput text. This function itself returns false only when the
+ * memstream backing debugOutput could not be created at all.
  */
 static bool DebugApi_CaptureOutput(void (*fn)(void *), void *arg, char *out, size_t outlen)
 {
@@ -232,22 +246,59 @@ static bool DebugApi_CaptureOutput(void (*fn)(void *), void *arg, char *out, siz
 	char *buf = NULL;
 	size_t buflen = 0;
 	FILE *ms;
+	FILE *errFile = NULL;
+	int savedErrFd = -1;
+	bool haveErrCapture = false;
 
 	ms = open_memstream(&buf, &buflen);
 	if (!ms)
 		return false;
 	debugOutput = ms;
+
+	fflush(stderr);
+	errFile = tmpfile();
+	if (errFile)
+	{
+		savedErrFd = dup(STDERR_FILENO);
+		if (savedErrFd >= 0)
+		{
+			if (dup2(fileno(errFile), STDERR_FILENO) >= 0)
+				haveErrCapture = true;
+			else
+			{
+				close(savedErrFd);
+				savedErrFd = -1;
+			}
+		}
+	}
+
 	fn(arg);
+
 	fflush(ms);
 	debugOutput = saved;
 	fclose(ms);
+
+	if (haveErrCapture)
+	{
+		fflush(stderr);
+		dup2(savedErrFd, STDERR_FILENO);
+		close(savedErrFd);
+	}
 
 	if (outlen > 0)
 	{
 		size_t n = buflen < outlen - 1 ? buflen : outlen - 1;
 		memcpy(out, buf, n);
+		if (haveErrCapture && n < outlen - 1)
+		{
+			size_t room = outlen - 1 - n;
+			rewind(errFile);
+			n += fread(out + n, 1, room, errFile);
+		}
 		out[n] = '\0';
 	}
+	if (errFile)
+		fclose(errFile);
 	free(buf);
 	return true;
 }
