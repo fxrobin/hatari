@@ -210,6 +210,7 @@ int main(int argc, char *argv[])
 	/* framebuffer: internal XRGB8888 buffer, allocated after the first frame */
 	const uint32_t *px = NULL;
 	int w = 0, h = 0;
+	CHECK(fb(NULL, &w, &h) == -1);
 	CHECK(fb(&px, &w, &h) == 0);
 	printf("framebuffer %dx%d\n", w, h);
 	CHECK(px != NULL && w >= 320 && h >= 200);

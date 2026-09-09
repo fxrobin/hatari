@@ -377,13 +377,16 @@ int hatari_disasm(uint32_t addr, int count, char *out, size_t outlen, uint32_t *
 /*-----------------------------------------------------------------------*/
 /**
  * Current host framebuffer (XRGB8888, pitch = width*4). Pointer stays
- * valid until the next resolution change.
+ * valid until the next resolution change. Returns -1 without writing
+ * anything if any output pointer is NULL or no buffer is allocated yet.
  */
 int hatari_framebuffer(const uint32_t **pixels, int *width, int *height)
 {
 	uint32_t *px = NULL;
 	int w = 0, h = 0, pitch = 0;
 
+	if (!pixels || !width || !height)
+		return -1;
 	Screen_GetDimension(&px, &w, &h, &pitch);
 	if (!px)
 		return -1;
@@ -404,15 +407,18 @@ void hatari_key(uint8_t scancode, bool press)
 
 
 /**
- * Insert a floppy image into drive 0 (A:) or 1 (B:).
+ * Insert a floppy image into drive 0 (A:) or 1 (B:). Returns -3 both when
+ * Floppy_SetDiskFileName() refuses the image (e.g. already inserted in the
+ * other drive) and when Floppy_InsertDiskIntoDrive() itself fails.
  */
 int hatari_disk_insert(int drive, const char *path)
 {
-	if (drive < 0 || drive > 1)
+	if (drive < 0 || drive >= MAX_FLOPPYDRIVES)
 		return -1;
 	if (!File_Exists(path))
 		return -2;
-	Floppy_SetDiskFileName(drive, path, NULL);
+	if (!Floppy_SetDiskFileName(drive, path, NULL))
+		return -3;
 	if (!Floppy_InsertDiskIntoDrive(drive))
 		return -3;
 	return 0;
@@ -424,7 +430,7 @@ int hatari_disk_insert(int drive, const char *path)
  */
 int hatari_disk_eject(int drive)
 {
-	if (drive < 0 || drive > 1)
+	if (drive < 0 || drive >= MAX_FLOPPYDRIVES)
 		return -1;
 	Floppy_EjectDiskFromDrive(drive);
 	return 0;
