@@ -139,4 +139,21 @@ class CoreIT {
         assertTrue(pos >= 1, "listing non reconnu : " + core.debugCommand("b"));
     }
 
+    /**
+     * Bout en bout clavier : ESC pendant l'ecran d'accueil EmuTOS doit faire
+     * avancer l'"early console" et donc changer l'affichage. Fait un reset
+     * (donc apres les tests qui detournent PC/RAM) et remet la machine dans un
+     * etat connu avant de presser la touche.
+     */
+    @Test
+    @Order(300)
+    void escapeKeyChangesScreen() {
+        core.reset(true);
+        core.run(120);
+        int[] before = core.frame().pixels();
+        fr.hatari.mcp.tools.InputTools.tap(core, fr.hatari.mcp.keymap.StScancodes.ofName("ESC").orElseThrow(), 2, 60);
+        int[] after = core.frame().pixels();
+        assertFalse(java.util.Arrays.equals(before, after), "ESC n'a pas modifie l'ecran d'accueil EmuTOS");
+    }
+
 }

@@ -1,6 +1,7 @@
 package fr.hatari.mcp;
 
 import fr.hatari.mcp.tools.DebugTools;
+import fr.hatari.mcp.tools.InputTools;
 import fr.hatari.mcp.tools.MachineTools;
 import fr.hatari.mcp.tools.MemoryTools;
 import fr.hatari.mcp.tools.VideoTools;
@@ -17,6 +18,7 @@ public final class ToolCatalog {
     private final MemoryTools memoryTools;
     private final DebugTools debugTools;
     private final VideoTools videoTools;
+    private final InputTools inputTools;
 
     public ToolCatalog(EmulatorSession session, McpJsonMapper mapper) {
         Tools tools = new Tools(mapper);
@@ -24,6 +26,7 @@ public final class ToolCatalog {
         this.memoryTools = new MemoryTools(session, tools);
         this.debugTools = new DebugTools(session, tools);
         this.videoTools = new VideoTools(session, tools);
+        this.inputTools = new InputTools(session, tools);
     }
 
     public List<SyncToolSpecification> all() {
@@ -32,6 +35,7 @@ public final class ToolCatalog {
         list.addAll(memoryTools.specs());
         list.addAll(debugTools.specs());
         list.addAll(videoTools.specs());
+        list.addAll(inputTools.specs());
         return list;
     }
 }
