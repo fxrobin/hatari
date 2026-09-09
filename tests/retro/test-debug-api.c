@@ -1,7 +1,8 @@
 /*
  * Test the hatari_* debug API exported by the libretro core.
  * Runs TOS-less (--tos none): FAKE_TOS_LOOP is an arbitrary RAM address
- * used to install a self-loop and drive PC/step tests from a known state.
+ * used to install a small NOP loop and drive PC/step tests from a known
+ * state.
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
@@ -13,6 +14,8 @@
 #include <string.h>
 
 #define FAKE_TOS_LOOP 0x1100
+/* 4 NOPs + "bra.s FAKE_TOS_LOOP", see below */
+#define FAKE_TOS_LOOP_SIZE 10
 /* IKBD scancode for the space bar (see src/includes/ikbd.h scancode table) */
 #define ST_SCANCODE_SPACE 0x39
 
@@ -130,12 +133,17 @@ int main(int argc, char *argv[])
 	CHECK(mem_read(0xFFFFFF, rbuf, 4) == -1);
 
 	/*
-	 * Install a self-loop ("bra.s *", bytes $60 $FE) at FAKE_TOS_LOOP,
-	 * point PC at it and run: this exercises mem_write + reg_set + run
-	 * together, without relying on where the fake TOS idles.
+	 * Install four NOPs ($4E71) followed by a branch back to the first
+	 * one ("bra.s FAKE_TOS_LOOP", bytes $60 $F6) at FAKE_TOS_LOOP, point
+	 * PC at it and run: this exercises mem_write + reg_set + run
+	 * together, without relying on where the fake TOS idles. Unlike a
+	 * one-instruction self-loop, the straight-line NOPs make the PC after
+	 * n single steps predictable (FAKE_TOS_LOOP + 2*n).
 	 */
-	uint8_t loop[2] = { 0x60, 0xFE };
-	CHECK(mem_write(FAKE_TOS_LOOP, loop, 2) == 0);
+	uint8_t loop[FAKE_TOS_LOOP_SIZE] = {
+		0x4E, 0x71, 0x4E, 0x71, 0x4E, 0x71, 0x4E, 0x71, 0x60, 0xF6
+	};
+	CHECK(mem_write(FAKE_TOS_LOOP, loop, sizeof(loop)) == 0);
 	/*
 	 * Mask all autovector interrupt levels (SR IPL = 7): the fake TOS
 	 * (faketos.s) does not fully set up its interrupt vector table, so
@@ -149,7 +157,7 @@ int main(int argc, char *argv[])
 	uint32_t r[20];
 	regs_get(r);
 	printf("pc=%06x sr=%04x a7=%08x\n", r[16], r[17], r[15]);
-	CHECK(r[16] >= FAKE_TOS_LOOP && r[16] < FAKE_TOS_LOOP + 2);
+	CHECK(r[16] >= FAKE_TOS_LOOP && r[16] < FAKE_TOS_LOOP + FAKE_TOS_LOOP_SIZE);
 
 	/* register write */
 	CHECK(reg_set("D3", 0x12345678) == 0);
@@ -157,14 +165,19 @@ int main(int argc, char *argv[])
 	CHECK(r[3] == 0x12345678);
 	CHECK(reg_set("Z9", 1) == -1);
 
-	/* single stepping from the self-loop: 3 instructions then STOP_STEPS */
+	/*
+	 * Single stepping from the first NOP: exactly 3 instructions run,
+	 * then STOP_STEPS, so the PC must sit on the 4th NOP.
+	 */
 	CHECK(reg_set("SR", 0x2700) == 0);
 	CHECK(reg_set("PC", FAKE_TOS_LOOP) == 0);
 	CHECK(step(3) == 0);
 	CHECK(run(100, &reason, &done) == 0);
-	printf("step 3: reason=%d done=%d\n", reason, done);
+	regs_get(r);
+	printf("step 3: reason=%d done=%d pc=%06x\n", reason, done, r[16]);
 	CHECK(reason == 2);
 	CHECK(done <= 1);
+	CHECK(r[16] == FAKE_TOS_LOOP + 3 * 2);
 
 	/*
 	 * Breakpoint via debugger command, then run until it triggers.
@@ -198,13 +211,13 @@ int main(int argc, char *argv[])
 	 */
 	CHECK(dbg("d $1100", out, sizeof(out)) == 1);
 	printf("d $1100:\n%s", out);
-	CHECK(strstr(out, "bra") != NULL || strstr(out, "BRA") != NULL);
+	CHECK(strstr(out, "nop") != NULL || strstr(out, "NOP") != NULL);
 
 	/* disassembly via hatari_disasm() directly */
 	uint32_t next = 0;
 	CHECK(disasm(FAKE_TOS_LOOP, 2, out, sizeof(out), &next) == 0);
 	printf("disasm:\n%s", out);
-	CHECK(strstr(out, "bra") != NULL || strstr(out, "BRA") != NULL);
+	CHECK(strstr(out, "nop") != NULL || strstr(out, "NOP") != NULL);
 	CHECK(next > FAKE_TOS_LOOP);
 
 	/* framebuffer: internal XRGB8888 buffer, allocated after the first frame */

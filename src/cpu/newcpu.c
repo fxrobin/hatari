@@ -5325,6 +5325,7 @@ static int do_specialties (int cycles)
 #ifdef WINUAE_FOR_HATARI
 	if (spcflags & SPCFLAG_DEBUGGER)
 		DebugCpu_Check();
+	spcflags = regs.spcflags;		/* the debugger may have set SPCFLAG_BRK */
 #endif
 
 	if (spcflags & SPCFLAG_BRK) {
