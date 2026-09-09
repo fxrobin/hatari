@@ -32,6 +32,7 @@ const char DebugApi_fileid[] = "Hatari debug_api.c";
 #include "sysdeps.h"
 #include "newcpu.h"
 #include "video.h"
+#include "main_retro.h"
 #include "68kDisass.h"
 #include "screen.h"
 #include "ikbd.h"
@@ -112,15 +113,13 @@ void hatari_counters(uint32_t *vbl, uint64_t *cycles)
 /**
  * Cold or warm reset.
  *
- * M68000_Reset() (called by Reset_Cold()/Reset_Warm()) raises
- * SPCFLAG_MODE_CHANGE so the CPU core's own m68k_go() loop notices the
- * reset and re-applies any pending CPU config change. The libretro core
- * only runs that loop once at startup (see has_cpu_config_changed in
- * main_retro.c) and drives every following frame with the lightweight
- * m68k_run(), which never clears SPCFLAG_MODE_CHANGE. Left set, it makes
- * do_specialties() return before it ever reaches the per-instruction
- * debugger hook, silently breaking hatari_step() after any reset. Clear
- * it here and restore the debugger hook the same way m68k_go() would.
+ * Reset_Cold()/Reset_Warm() only record the request: M68000_Reset() sets
+ * quit_program and SPCFLAG_MODE_CHANGE, and the CPU core performs the
+ * reset (PC reloaded from the reset vector, MODE_CHANGE cleared, debugger
+ * hooks restored) in its m68k_go() loop. Retro_RequestCpuReset() makes the
+ * next retro_run() enter that loop instead of the plain m68k_run(), so
+ * emulation really restarts from the reset vector rather than resuming at
+ * the old PC on freshly reset hardware.
  */
 void hatari_reset(bool cold)
 {
@@ -128,8 +127,7 @@ void hatari_reset(bool cold)
 		Reset_Cold();
 	else
 		Reset_Warm();
-	M68000_UnsetSpecial(SPCFLAG_MODE_CHANGE);
-	M68000_RestoreDebugger();
+	Retro_RequestCpuReset();
 }
 
 

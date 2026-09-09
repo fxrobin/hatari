@@ -19,6 +19,7 @@
 #include "version.h"
 
 static bool has_cpu_config_changed = true;
+static bool bCpuResetPending;
 
 retro_environment_t environment_cb;
 retro_video_refresh_t video_refresh_cb;
@@ -100,9 +101,25 @@ RETRO_API void retro_get_system_av_info(struct retro_system_av_info *info)
 	info->timing.sample_rate = nAudioFrequency;
 }
 
+/**
+ * Ask retro_run() to go through m68k_go() on its next call.
+ *
+ * Reset_Cold()/Reset_Warm() only record the request (M68000_Reset() sets
+ * quit_program and SPCFLAG_MODE_CHANGE); the reset itself is performed by
+ * the CPU core's m68k_go() loop, which reloads the PC from the reset
+ * vector. retro_run() otherwise drives the emulation with m68k_run(),
+ * which never processes that request.
+ */
+void Retro_RequestCpuReset(void)
+{
+	has_cpu_config_changed = true;
+	bCpuResetPending = true;
+}
+
 RETRO_API void retro_reset(void)
 {
 	Reset_Warm();
+	Retro_RequestCpuReset();
 }
 
 RETRO_API void retro_run(void)
@@ -112,7 +129,11 @@ RETRO_API void retro_run(void)
 	if (has_cpu_config_changed)
 	{
 		has_cpu_config_changed = false;
-		UAE_Set_Quit_Reset(false);
+		/* a pending reset already set quit_program to the requested
+		 * (cold or warm) kind, don't downgrade it to a warm one */
+		if (!bCpuResetPending)
+			UAE_Set_Quit_Reset(false);
+		bCpuResetPending = false;
 		m68k_go(true);
 	}
 	else

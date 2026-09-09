@@ -239,6 +239,39 @@ int main(int argc, char *argv[])
 	CHECK(disk_insert(0, "/nonexistent/x.st") == -2);
 	CHECK(disk_eject(0) == 0);
 
+	/*
+	 * Reset while the PC points into RAM: the CPU core must restart from
+	 * the reset vector (fake TOS in ROM) instead of resuming at the old
+	 * PC on freshly reset hardware.
+	 */
+	CHECK(mem_write(FAKE_TOS_LOOP, loop, sizeof(loop)) == 0);
+	CHECK(reg_set("SR", 0x2700) == 0);
+	CHECK(reg_set("PC", FAKE_TOS_LOOP) == 0);
+	CHECK(run(1, &reason, &done) == 0);
+	reset(true);
+	CHECK(run(5, &reason, &done) == 0);
+	regs_get(r);
+	printf("after cold reset: pc=%06x\n", r[16]);
+	CHECK(r[16] >= 0xE00000 && r[16] < 0xF00000);
+
+	/* single stepping must still work after a reset */
+	CHECK(step(1) == 0);
+	CHECK(run(10, &reason, &done) == 0);
+	printf("step after reset: reason=%d done=%d\n", reason, done);
+	CHECK(reason == 2);
+
+	/* a warm reset restarts from the reset vector but keeps ST RAM */
+	CHECK(mem_write(FAKE_TOS_LOOP, loop, sizeof(loop)) == 0);
+	CHECK(reg_set("PC", FAKE_TOS_LOOP) == 0);
+	reset(false);
+	CHECK(run(5, &reason, &done) == 0);
+	regs_get(r);
+	CHECK(mem_read(FAKE_TOS_LOOP, rbuf, 4) == 0);
+	printf("after warm reset: pc=%06x ram=%02x %02x %02x %02x\n",
+	       r[16], rbuf[0], rbuf[1], rbuf[2], rbuf[3]);
+	CHECK(r[16] >= 0xE00000 && r[16] < 0xF00000);
+	CHECK(rbuf[0] == 0x4E && rbuf[1] == 0x71);
+
 	printf("All debug-api tests finished successfully.\n");
 	deinit();
 	dlclose(dlh);
