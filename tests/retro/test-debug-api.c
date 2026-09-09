@@ -13,6 +13,8 @@
 #include <string.h>
 
 #define FAKE_TOS_LOOP 0x1100
+/* IKBD scancode for the space bar (see src/includes/ikbd.h scancode table) */
+#define ST_SCANCODE_SPACE 0x39
 
 /*
  * Checks below use an explicit condition instead of assert() because this
@@ -86,6 +88,10 @@ int main(int argc, char *argv[])
 	int (*step)(int) = sym("hatari_step");
 	int (*dbg)(const char *, char *, size_t) = sym("hatari_dbg_command");
 	int (*disasm)(uint32_t, int, char *, size_t, uint32_t *) = sym("hatari_disasm");
+	int (*fb)(const uint32_t **, int *, int *) = sym("hatari_framebuffer");
+	void (*key)(uint8_t, bool) = sym("hatari_key");
+	int (*disk_insert)(int, const char *) = sym("hatari_disk_insert");
+	int (*disk_eject)(int) = sym("hatari_disk_eject");
 
 	set_env(env_cb);
 	set_video(video_cb);
@@ -200,6 +206,24 @@ int main(int argc, char *argv[])
 	printf("disasm:\n%s", out);
 	CHECK(strstr(out, "bra") != NULL || strstr(out, "BRA") != NULL);
 	CHECK(next > FAKE_TOS_LOOP);
+
+	/* framebuffer: internal XRGB8888 buffer, allocated after the first frame */
+	const uint32_t *px = NULL;
+	int w = 0, h = 0;
+	CHECK(fb(&px, &w, &h) == 0);
+	printf("framebuffer %dx%d\n", w, h);
+	CHECK(px != NULL && w >= 320 && h >= 200);
+
+	/* keyboard: press then release space, driven through a couple of frames */
+	key(ST_SCANCODE_SPACE, true);
+	CHECK(run(2, &reason, &done) == 0);
+	key(ST_SCANCODE_SPACE, false);
+	CHECK(run(2, &reason, &done) == 0);
+
+	/* floppy: invalid drive, missing file, then a valid eject */
+	CHECK(disk_insert(2, "x.st") == -1);
+	CHECK(disk_insert(0, "/nonexistent/x.st") == -2);
+	CHECK(disk_eject(0) == 0);
 
 	printf("All debug-api tests finished successfully.\n");
 	deinit();

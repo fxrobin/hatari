@@ -33,6 +33,10 @@ const char DebugApi_fileid[] = "Hatari debug_api.c";
 #include "newcpu.h"
 #include "video.h"
 #include "68kDisass.h"
+#include "screen.h"
+#include "ikbd.h"
+#include "floppy.h"
+#include "file.h"
 #include "debug_api.h"
 
 static int stopReason = HATARI_STOP_NONE;
@@ -366,5 +370,62 @@ int hatari_disasm(uint32_t addr, int count, char *out, size_t outlen, uint32_t *
 		return -1;
 	if (next_pc)
 		*next_pc = req.next;
+	return 0;
+}
+
+
+/*-----------------------------------------------------------------------*/
+/**
+ * Current host framebuffer (XRGB8888, pitch = width*4). Pointer stays
+ * valid until the next resolution change.
+ */
+int hatari_framebuffer(const uint32_t **pixels, int *width, int *height)
+{
+	uint32_t *px = NULL;
+	int w = 0, h = 0, pitch = 0;
+
+	Screen_GetDimension(&px, &w, &h, &pitch);
+	if (!px)
+		return -1;
+	*pixels = px;
+	*width = w;
+	*height = h;
+	return 0;
+}
+
+
+/**
+ * Press or release an ST keyboard scancode.
+ */
+void hatari_key(uint8_t scancode, bool press)
+{
+	IKBD_PressSTKey(scancode, press);
+}
+
+
+/**
+ * Insert a floppy image into drive 0 (A:) or 1 (B:).
+ */
+int hatari_disk_insert(int drive, const char *path)
+{
+	if (drive < 0 || drive > 1)
+		return -1;
+	if (!File_Exists(path))
+		return -2;
+	Floppy_SetDiskFileName(drive, path, NULL);
+	if (!Floppy_InsertDiskIntoDrive(drive))
+		return -3;
+	return 0;
+}
+
+
+/**
+ * Eject the floppy from given drive.
+ */
+int hatari_disk_eject(int drive)
+{
+	if (drive < 0 || drive > 1)
+		return -1;
+	Floppy_EjectDiskFromDrive(drive);
 	return 0;
 }
