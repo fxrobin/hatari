@@ -25,7 +25,6 @@ const char DebugApi_fileid[] = "Hatari debug_api.c";
 #include "debugcpu.h"
 #include "debugui.h"
 #include "debug_priv.h"
-#include "log.h"
 #include "m68000.h"
 #include "reset.h"
 #include "stMemory.h"
