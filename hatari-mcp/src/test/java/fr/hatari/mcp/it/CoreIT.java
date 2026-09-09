@@ -92,6 +92,27 @@ class CoreIT {
         assertEquals(0x2106, core.registers().pc());
     }
 
+    /**
+     * Reset alors que le PC a ete detourne vers la RAM : le coeur doit repartir du
+     * vecteur de reset (ROM) au lieu de reprendre a l'ancien PC sur un materiel
+     * fraichement reinitialise -- ce qui faisait mourir le processus hote.
+     */
+    @Test
+    @Order(210)
+    void resetFromRamPcReturnsToRom() {
+        core.writeMemory(0x2100, new byte[] {
+            0x4E, 0x71, 0x4E, 0x71, 0x4E, 0x71, 0x4E, 0x71, 0x60, (byte) 0xF6
+        });
+        core.setRegister("SR", 0x2700);
+        core.setRegister("PC", 0x2100);
+        core.run(1);
+        core.reset(true);
+        Machine.RunResult r = core.run(300);
+        assertEquals(Machine.StopReason.NONE, r.reason());
+        long pc = core.registers().pc();
+        assertTrue(pc >= 0xE00000 && pc < 0xF00000, "PC hors ROM apres reset : " + Long.toHexString(pc));
+    }
+
     @Test
     @Order(5)
     void disassembleReturnsText() {
