@@ -47,7 +47,24 @@ Variables d'environnement reconnues par le lanceur :
 |---------------|------------------------------------------|--------------------------------|
 | `HATARI_CORE` | `<repo>/build/src/libretro-hatari.so`     | Chemin du cœur libretro        |
 | `HATARI_TOS`  | `~/.hatari/tos.img`                       | Image TOS à charger            |
-| `JAVA_HOME`   | `~/.sdkman/candidates/java/25.0.4-tem`    | JDK utilisé pour lancer le jar |
+| `HATARI_JDK`  | *(non défini)*                            | JDK 25 à utiliser, prioritaire sur tout le reste |
+| `JAVA_HOME`   | *(hérité de l'environnement)*             | JDK de repli, utilisé en dernier |
+
+Le JDK est choisi dans cet ordre :
+
+1. `$HATARI_JDK` s'il est défini ;
+2. `~/.sdkman/candidates/java/25.0.4-tem` si son `bin/java` existe ;
+3. le `$JAVA_HOME` hérité de l'environnement appelant.
+
+`$JAVA_HOME` vient en dernier parce qu'il pointe fréquemment un lien sdkman
+`current` sur une version plus ancienne. Le lanceur interroge ensuite
+`java.specification.version` du JDK retenu et refuse de démarrer (code de
+retour 1, message sur stderr) si elle est inférieure à 25 : l'API Foreign
+Function & Memory utilisée par le binding n'est stable qu'à partir de Java 25,
+et un JDK plus ancien échouerait sur un `UnsupportedClassVersionError`.
+
+Si le jar doit être reconstruit, le lanceur vérifie la présence de `mvn` dans
+le `PATH` et s'arrête avec un message explicite s'il est absent.
 
 Le serveur s'arrête à la fermeture de stdin (comportement standard d'un
 transport MCP stdio), pas sur un signal.
