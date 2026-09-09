@@ -33,15 +33,24 @@ public final class DebugTools {
                 listBreakpoints(), loadSymbols(), debugCommand());
     }
 
-    /** Envoie « b <expr> » et vérifie l'acquittement de Hatari. */
+    /**
+     * Envoie « b <expr> », vérifie l'acquittement de Hatari et enregistre le point.
+     *
+     * <p>L'envoi et la mise à jour de {@code points}/{@code nextId} tiennent dans un seul
+     * {@code session.read} : la carte locale et l'état du debugger Hatari sont ainsi
+     * modifiés sous le même moniteur, sans fenêtre où deux appels concurrents
+     * pourraient s'attribuer le même id ou observer une carte désynchronisée.
+     */
     private Point add(String kind, String expression, String label) {
-        String out = session.read(m -> m.debugCommand("b " + expression));
-        if (!out.contains("added")) {
-            throw new IllegalStateException("Hatari a refusé le breakpoint : " + out.trim());
-        }
-        Point p = new Point(nextId++, kind, expression, label);
-        points.put(p.id(), p);
-        return p;
+        return session.read(m -> {
+            String out = m.debugCommand("b " + expression);
+            if (!out.contains("added")) {
+                throw new IllegalStateException("Hatari a refusé le breakpoint : " + out.trim());
+            }
+            Point p = new Point(nextId++, kind, expression, label);
+            points.put(p.id(), p);
+            return p;
+        });
     }
 
     /**
@@ -52,39 +61,74 @@ public final class DebugTools {
      * « b all » efface aussi les points Hatari de l'autre type, ce qui obligerait à les reposer
      * avec de nouveaux ids Hatari — les ids Java de l'autre type doivent rester stables et
      * retirables après un {@code clear_breakpoint {all}} / {@code clear_watchpoint {all}}.
+     *
+     * <p>Toute la transaction (lecture du listing, suppressions, mise à jour de {@code points})
+     * se fait dans un seul {@code session.read} : la carte locale est modifiée sous le même
+     * moniteur que les commandes envoyées au debugger.
+     *
+     * <p>En mode {@code all}, un point disparu du listing Hatari entre-temps (un « :once » qui a
+     * déclenché, par exemple) n'interrompt pas la boucle : il est retiré de la carte locale, son
+     * id est reporté dans {@code vanished} et les autres ids sont traités normalement.
      */
     private Map<String, Object> clear(String kind, Args args) {
-        Map<String, Object> out = new LinkedHashMap<>();
-        if (args.bool("all", false)) {
-            List<Integer> ids = points.values().stream()
-                    .filter(p -> p.kind().equals(kind))
-                    .map(Point::id)
-                    .toList();
-            for (int id : ids) removeOne(id, kind);
+        boolean all = args.bool("all", false);
+        int wanted = all ? -1 : args.intVal("id");
+        return session.read(m -> {
+            Map<String, Object> out = new LinkedHashMap<>();
+            if (all) {
+                List<Integer> ids = points.values().stream()
+                        .filter(p -> p.kind().equals(kind))
+                        .map(Point::id)
+                        .toList();
+                List<Integer> vanished = new ArrayList<>();
+                int cleared = 0;
+                for (int id : ids) {
+                    if (removeOne(m, id, kind, true)) {
+                        cleared++;
+                    } else {
+                        vanished.add(id);
+                    }
+                }
+                out.put("ok", true);
+                out.put("cleared", cleared);
+                out.put("vanished", vanished);
+                return out;
+            }
+            removeOne(m, wanted, kind, false);
             out.put("ok", true);
-            out.put("cleared", ids.size());
+            out.put("id", wanted);
             return out;
-        }
-        int id = args.intVal("id");
-        removeOne(id, kind);
-        out.put("ok", true);
-        out.put("id", id);
-        return out;
+        });
     }
 
-    /** Retire un point par id : relit le listing Hatari et cherche sa position par expression juste avant de le retirer. */
-    private void removeOne(int id, String kind) {
+    /**
+     * Retire un point par id : relit le listing Hatari et cherche sa position par expression
+     * juste avant de le retirer.
+     *
+     * @param m         machine, déjà détenue par l'appelant sous le verrou de session
+     * @param id        id Java du point
+     * @param kind      type attendu (« bp » ou « wp »)
+     * @param tolerateVanished si vrai, un point absent du listing Hatari est simplement retiré
+     *                         de la carte locale et signalé par la valeur de retour au lieu de
+     *                         lever une exception
+     * @return vrai si le point a bien été retiré côté Hatari, faux s'il avait déjà disparu
+     */
+    private boolean removeOne(Machine m, int id, String kind, boolean tolerateVanished) {
         Point p = points.get(id);
         if (p == null || !p.kind().equals(kind)) {
             throw new IllegalArgumentException(kind + " id inconnu: " + id);
         }
-        OptionalInt position = session.read(m -> MachineTools.breakpointPosition(m.debugCommand("b"), p.expression()));
+        OptionalInt position = MachineTools.breakpointPosition(m.debugCommand("b"), p.expression());
         if (position.isEmpty()) {
             points.remove(id);
+            if (tolerateVanished) {
+                return false;
+            }
             throw new IllegalStateException("point " + id + " absent du listing Hatari (déjà retiré par :once ?)");
         }
-        session.read(m -> m.debugCommand("b " + position.getAsInt()));
+        m.debugCommand("b " + position.getAsInt());
         points.remove(id);
+        return true;
     }
 
     /** Position Hatari (1-based) d'une expression dans le listing « b », -1 si absente. */
@@ -107,7 +151,9 @@ public final class DebugTools {
     }
 
     private SyncToolSpecification clearBreakpoint() {
-        return tools.tool("clear_breakpoint", "Retire un breakpoint par id, ou tous avec all=true.",
+        return tools.tool("clear_breakpoint",
+                "Retire un breakpoint par id, ou tous avec all=true ; avec all, les ids déjà disparus du "
+                        + "listing Hatari (« :once » déclenché) sont reportés dans « vanished » sans erreur.",
                 "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"integer\"},\"all\":{\"type\":\"boolean\"}}}",
                 args -> clear("bp", args));
     }
@@ -139,7 +185,9 @@ public final class DebugTools {
     }
 
     private SyncToolSpecification clearWatchpoint() {
-        return tools.tool("clear_watchpoint", "Retire un watchpoint par id, ou tous avec all=true.",
+        return tools.tool("clear_watchpoint",
+                "Retire un watchpoint par id, ou tous avec all=true ; avec all, les ids déjà disparus du "
+                        + "listing Hatari sont reportés dans « vanished » sans erreur.",
                 "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"integer\"},\"all\":{\"type\":\"boolean\"}}}",
                 args -> clear("wp", args));
     }
@@ -147,7 +195,7 @@ public final class DebugTools {
     private SyncToolSpecification listBreakpoints() {
         return tools.tool("list_breakpoints", "Liste les breakpoints et watchpoints posés par ce serveur, et le listing Hatari brut.",
                 "{\"type\":\"object\",\"properties\":{}}",
-                args -> {
+                args -> session.read(m -> {
                     List<Map<String, Object>> rows = new ArrayList<>();
                     for (Point p : points.values()) {
                         Map<String, Object> row = new LinkedHashMap<>();
@@ -159,9 +207,9 @@ public final class DebugTools {
                     }
                     Map<String, Object> out = new LinkedHashMap<>();
                     out.put("points", rows);
-                    out.put("hatari", session.read(m -> m.debugCommand("b")));
+                    out.put("hatari", m.debugCommand("b"));
                     return out;
-                });
+                }));
     }
 
     private SyncToolSpecification loadSymbols() {

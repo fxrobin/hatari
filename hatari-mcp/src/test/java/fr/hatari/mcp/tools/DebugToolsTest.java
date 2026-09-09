@@ -7,6 +7,7 @@ import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -109,6 +110,36 @@ class DebugToolsTest {
         // FakeMachine ne renumérote pas après une suppression : la position de bp2 reste 2,
         // jamais déduite d'un cache posé au moment de l'ajout.
         assertEquals("dbg b 2", fake.calls.get(1));
+    }
+
+    /**
+     * Un point disparu du listing Hatari entre-temps (« :once » déclenché) ne doit pas faire
+     * échouer un « clear all » : il est retiré de la carte locale, reporté dans « vanished »,
+     * et les autres ids sont bien retirés.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void clearAllReportsVanishedPointsInsteadOfFailing() {
+        fake.debugOutput = "CPU condition breakpoint 1 added.\n";
+        Map<String, Object> bp1 = call("set_breakpoint", Map.of("pc", "E00D98"));
+        fake.debugOutput = "CPU condition breakpoint 1 added.\n";
+        Map<String, Object> bp2 = call("set_breakpoint", Map.of("pc", "E01000"));
+
+        // Hatari a retiré bp1 tout seul (:once) : on le sort du listing dans le dos de l'outil.
+        fake.breakpoints.entrySet().removeIf(e -> e.getValue().contains("$E00D98"));
+        fake.calls.clear();
+
+        Map<String, Object> out = call("clear_breakpoint", Map.of("all", true));
+        assertEquals(true, out.get("ok"));
+        assertEquals(1, out.get("cleared"));
+        assertEquals(List.of(bp1.get("id")), out.get("vanished"));
+        assertTrue(fake.calls.contains("dbg b 2"), "bp2 doit quand même être retiré : " + fake.calls);
+
+        // Les deux ids sont partis de la carte locale : plus rien à retirer.
+        Map<String, Object> again = call("clear_breakpoint", Map.of("all", true));
+        assertEquals(0, again.get("cleared"));
+        assertEquals(List.of(), again.get("vanished"));
+        assertNotEquals(bp1.get("id"), bp2.get("id"));
     }
 
     @Test
