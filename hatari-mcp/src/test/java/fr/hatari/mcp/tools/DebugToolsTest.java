@@ -71,9 +71,58 @@ class DebugToolsTest {
     }
 
     @Test
-    void clearAllSendsBAll() {
-        call("clear_breakpoint", Map.of("all", true));
-        assertEquals("dbg b all", fake.calls.get(0));
+    void clearAllRemovesOnlyTheRequestedKindWithoutRenumberingTheOther() {
+        fake.debugOutput = "CPU condition breakpoint 1 added.\n";
+        call("set_breakpoint", Map.of("pc", "E00D98")); // bp id 1
+        fake.debugOutput = "CPU condition breakpoint 1 added.\n";
+        call("set_watchpoint", Map.of("addr", "004000", "len", 2)); // wp id 2
+        fake.debugOutput = "CPU condition breakpoint 1 added.\n";
+        Map<String, Object> wp2 = call("set_watchpoint", Map.of("addr", "005000", "len", 2)); // wp id 3
+        fake.calls.clear();
+
+        Map<String, Object> out = call("clear_breakpoint", Map.of("all", true));
+        assertEquals(true, out.get("ok"));
+        assertEquals(1, out.get("cleared"));
+        assertFalse(fake.calls.contains("dbg b all"), "« b all » retirerait aussi les watchpoints côté Hatari");
+        assertTrue(fake.calls.contains("dbg b"), "doit relister avant de retirer");
+
+        // Le watchpoint id 3 doit rester retirable avec son id inchangé (pas de renumérotation).
+        Map<String, Object> cleared = call("clear_watchpoint", Map.of("id", wp2.get("id")));
+        assertEquals(true, cleared.get("ok"));
+    }
+
+    @Test
+    void sequentialRemovalSearchesFreshListingEachTime() {
+        fake.debugOutput = "CPU condition breakpoint 1 added.\n";
+        Map<String, Object> bp1 = call("set_breakpoint", Map.of("pc", "E00D98"));
+        fake.debugOutput = "CPU condition breakpoint 1 added.\n";
+        Map<String, Object> bp2 = call("set_breakpoint", Map.of("pc", "E01000"));
+        fake.calls.clear();
+
+        call("clear_breakpoint", Map.of("id", bp1.get("id")));
+        assertEquals("dbg b", fake.calls.get(0));
+        assertEquals("dbg b 1", fake.calls.get(1));
+
+        fake.calls.clear();
+        call("clear_breakpoint", Map.of("id", bp2.get("id")));
+        assertEquals("dbg b", fake.calls.get(0));
+        // FakeMachine ne renumérote pas après une suppression : la position de bp2 reste 2,
+        // jamais déduite d'un cache posé au moment de l'ajout.
+        assertEquals("dbg b 2", fake.calls.get(1));
+    }
+
+    @Test
+    void clearBreakpointFailsForUnknownId() {
+        CallToolResult r = rawCall(catalog, "clear_breakpoint", Map.of("id", 42));
+        assertEquals(Boolean.TRUE, r.isError());
+    }
+
+    @Test
+    void clearBreakpointFailsForWatchpointId() {
+        fake.debugOutput = "CPU condition breakpoint 1 added.\n";
+        Map<String, Object> wp = call("set_watchpoint", Map.of("addr", "004000"));
+        CallToolResult r = rawCall(catalog, "clear_breakpoint", Map.of("id", wp.get("id")));
+        assertEquals(Boolean.TRUE, r.isError());
     }
 
     @Test

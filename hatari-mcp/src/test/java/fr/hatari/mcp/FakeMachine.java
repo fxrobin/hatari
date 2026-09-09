@@ -49,12 +49,11 @@ public class FakeMachine implements Machine {
                 sb.append(String.format("%4d:\t%s\n", e.getKey(), e.getValue()));
             }
             return sb.toString();
-        } else if (cmd.startsWith("b ") && !cmd.contains("=")) {
-            // Remove breakpoint by position
-            try {
-                int pos = Integer.parseInt(cmd.substring(2).trim());
-                breakpoints.remove(pos);
-            } catch (NumberFormatException ignore) {}
+        } else if (cmd.startsWith("b ") && cmd.substring(2).trim().matches("\\d+")) {
+            // Remove breakpoint by position ("b <n>", digits only : distinct from an
+            // expression, which may contain "=" (breakpoints) or "!" (watchpoints)).
+            int pos = Integer.parseInt(cmd.substring(2).trim());
+            breakpoints.remove(pos);
         } else if (cmd.startsWith("b ")) {
             // Add breakpoint: "b pc = $E00D98 :once" or similar
             String expr = cmd.substring(2);

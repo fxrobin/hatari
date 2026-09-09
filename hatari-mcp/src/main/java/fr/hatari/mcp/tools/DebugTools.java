@@ -44,27 +44,39 @@ public final class DebugTools {
         return p;
     }
 
-    /** Retire tous les points d'un type, ou un seul par id. */
+    /**
+     * Retire tous les points d'un type, ou un seul par id.
+     *
+     * <p>{@code all} retire chaque point du type demandé un par un (relisting + recherche par
+     * expression avant chaque suppression, comme le cas par id) plutôt que d'envoyer « b all » :
+     * « b all » efface aussi les points Hatari de l'autre type, ce qui obligerait à les reposer
+     * avec de nouveaux ids Hatari — les ids Java de l'autre type doivent rester stables et
+     * retirables après un {@code clear_breakpoint {all}} / {@code clear_watchpoint {all}}.
+     */
     private Map<String, Object> clear(String kind, Args args) {
         Map<String, Object> out = new LinkedHashMap<>();
         if (args.bool("all", false)) {
-            session.read(m -> m.debugCommand("b all"));
-            int n = (int) points.values().stream().filter(p -> p.kind().equals(kind)).count();
-            points.values().removeIf(p -> p.kind().equals(kind));
-            // « b all » retire aussi les points de l'autre type côté Hatari : on les repose.
-            List<Point> others = new ArrayList<>(points.values());
-            points.clear();
-            for (Point p : others) add(p.kind(), p.expression(), p.label());
+            List<Integer> ids = points.values().stream()
+                    .filter(p -> p.kind().equals(kind))
+                    .map(Point::id)
+                    .toList();
+            for (int id : ids) removeOne(id, kind);
             out.put("ok", true);
-            out.put("cleared", n);
+            out.put("cleared", ids.size());
             return out;
         }
         int id = args.intVal("id");
+        removeOne(id, kind);
+        out.put("ok", true);
+        out.put("id", id);
+        return out;
+    }
+
+    /** Retire un point par id : relit le listing Hatari et cherche sa position par expression juste avant de le retirer. */
+    private void removeOne(int id, String kind) {
         Point p = points.get(id);
         if (p == null || !p.kind().equals(kind)) {
-            out.put("ok", false);
-            out.put("id", id);
-            return out;
+            throw new IllegalArgumentException(kind + " id inconnu: " + id);
         }
         OptionalInt position = session.read(m -> MachineTools.breakpointPosition(m.debugCommand("b"), p.expression()));
         if (position.isEmpty()) {
@@ -73,9 +85,6 @@ public final class DebugTools {
         }
         session.read(m -> m.debugCommand("b " + position.getAsInt()));
         points.remove(id);
-        out.put("ok", true);
-        out.put("id", id);
-        return out;
     }
 
     /** Position Hatari (1-based) d'une expression dans le listing « b », -1 si absente. */
