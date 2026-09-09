@@ -130,4 +130,13 @@ class CoreIT {
         assertTrue(core.cycleCount() > cycles);
     }
 
+    @Test
+    @Order(7)
+    void breakpointListingMatchesParser() {
+        core.debugCommand("b pc = $E00000");
+        int pos = fr.hatari.mcp.tools.DebugTools.positionOf(core, "pc = $E00000");
+        core.debugCommand("b " + pos);
+        assertTrue(pos >= 1, "listing non reconnu : " + core.debugCommand("b"));
+    }
+
 }
