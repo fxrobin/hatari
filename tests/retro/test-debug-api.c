@@ -1,6 +1,7 @@
 /*
  * Test the hatari_* debug API exported by the libretro core.
- * Runs TOS-less (--tos none): the fake TOS loops at $1100.
+ * Runs TOS-less (--tos none): FAKE_TOS_LOOP is an arbitrary RAM address
+ * used to install a self-loop and drive PC/step tests from a known state.
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
@@ -78,6 +79,11 @@ int main(int argc, char *argv[])
 	int (*run)(int, int *, int *) = sym("hatari_run");
 	void (*counters)(uint32_t *, uint64_t *) = sym("hatari_counters");
 	void (*reset)(bool) = sym("hatari_reset");
+	int (*mem_read)(uint32_t, uint8_t *, size_t) = sym("hatari_mem_read");
+	int (*mem_write)(uint32_t, const uint8_t *, size_t) = sym("hatari_mem_write");
+	void (*regs_get)(uint32_t *) = sym("hatari_regs_get");
+	int (*reg_set)(const char *, uint32_t) = sym("hatari_reg_set");
+	int (*step)(int) = sym("hatari_step");
 
 	set_env(env_cb);
 	set_video(video_cb);
@@ -107,6 +113,50 @@ int main(int argc, char *argv[])
 	rc = run(1, &reason, &done);
 	CHECK(rc == 0);
 	CHECK(done == 1);
+
+	/* memory round trip in RAM */
+	uint8_t wbuf[4] = { 0xDE, 0xAD, 0xBE, 0xEF }, rbuf[4] = { 0 };
+	CHECK(mem_write(0x2000, wbuf, 4) == 0);
+	CHECK(mem_read(0x2000, rbuf, 4) == 0);
+	CHECK(memcmp(wbuf, rbuf, 4) == 0);
+	CHECK(mem_read(0xFFFFFF, rbuf, 4) == -1);
+
+	/*
+	 * Install a self-loop ("bra.s *", bytes $60 $FE) at FAKE_TOS_LOOP,
+	 * point PC at it and run: this exercises mem_write + reg_set + run
+	 * together, without relying on where the fake TOS idles.
+	 */
+	uint8_t loop[2] = { 0x60, 0xFE };
+	CHECK(mem_write(FAKE_TOS_LOOP, loop, 2) == 0);
+	/*
+	 * Mask all autovector interrupt levels (SR IPL = 7): the fake TOS
+	 * (faketos.s) does not fully set up its interrupt vector table, so
+	 * letting a VBL/HBL/MFP interrupt fire while PC sits on our
+	 * hand-installed loop would vector through garbage.
+	 */
+	CHECK(reg_set("SR", 0x2700) == 0);
+	CHECK(reg_set("PC", FAKE_TOS_LOOP) == 0);
+	CHECK(run(1, &reason, &done) == 0);
+
+	uint32_t r[20];
+	regs_get(r);
+	printf("pc=%06x sr=%04x a7=%08x\n", r[16], r[17], r[15]);
+	CHECK(r[16] >= FAKE_TOS_LOOP && r[16] < FAKE_TOS_LOOP + 2);
+
+	/* register write */
+	CHECK(reg_set("D3", 0x12345678) == 0);
+	regs_get(r);
+	CHECK(r[3] == 0x12345678);
+	CHECK(reg_set("Z9", 1) == -1);
+
+	/* single stepping from the self-loop: 3 instructions then STOP_STEPS */
+	CHECK(reg_set("SR", 0x2700) == 0);
+	CHECK(reg_set("PC", FAKE_TOS_LOOP) == 0);
+	CHECK(step(3) == 0);
+	CHECK(run(100, &reason, &done) == 0);
+	printf("step 3: reason=%d done=%d\n", reason, done);
+	CHECK(reason == 2);
+	CHECK(done <= 1);
 
 	printf("All debug-api tests finished successfully.\n");
 	deinit();
