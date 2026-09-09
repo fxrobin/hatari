@@ -203,7 +203,14 @@ public final class HatariCore implements Machine {
     public void close() {
         if (closed) return;
         closed = true;
-        try { deinit.invoke(); } catch (Throwable t) { throw wrap(t); }
-        arena.close();
+        // L'arène doit être libérée même si retro_deinit échoue : sinon la mémoire
+        // native et le handle de bibliothèque resteraient ouverts pour de bon.
+        try {
+            deinit.invoke();
+        } catch (Throwable t) {
+            throw wrap(t);
+        } finally {
+            arena.close();
+        }
     }
 }

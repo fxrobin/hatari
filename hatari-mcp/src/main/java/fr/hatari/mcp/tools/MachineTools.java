@@ -9,6 +9,7 @@ import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.OptionalInt;
 import java.util.regex.Matcher;
@@ -65,11 +66,17 @@ public final class MachineTools {
         return OptionalInt.empty();
     }
 
-    /** Normalize expression: lowercase, strip :once and :N suffixes. */
+    /**
+     * Normalize expression: lowercase, drop every whitespace character, then strip a
+     * trailing :once / :N suffix. Hatari re-prints a breakcond expression token by token,
+     * separated by spaces ("( $4000 ) . w ! ( $4000 ) . w"), which does not match the
+     * compact form the tools send ("($4000).w ! ($4000).w"): comparing whitespace-free
+     * is what makes a watchpoint findable again in the "b" listing.
+     */
     private static String normalizeExpression(String expr) {
-        return expr.toLowerCase()
-                .replaceAll("\\s+:(?:once|\\d+)\\s*$", "")
-                .trim();
+        return expr.toLowerCase(Locale.ROOT)
+                .replaceAll("\\s+", "")
+                .replaceAll(":(?:once|\\d+)$", "");
     }
 
     private SyncToolSpecification ping() {
@@ -119,7 +126,8 @@ public final class MachineTools {
     private SyncToolSpecification runUntilPc() {
         return tools.tool("run_until_pc",
                 "Exécute jusqu'à ce que PC atteigne l'adresse hex donnée (breakpoint temporaire), "
-                        + "au plus max_frames trames (défaut " + DEFAULT_MAX_FRAMES + ").",
+                        + "au plus max_frames trames (défaut " + DEFAULT_MAX_FRAMES + ") ; le champ « reached » "
+                        + "vaut vrai si l'adresse a été atteinte, faux si la limite de trames a expiré avant.",
                 "{\"type\":\"object\",\"required\":[\"pc\"],\"properties\":{"
                         + "\"pc\":{\"type\":\"string\"},\"max_frames\":{\"type\":\"integer\",\"minimum\":1}}}",
                 args -> {

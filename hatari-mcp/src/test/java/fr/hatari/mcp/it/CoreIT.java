@@ -1,12 +1,23 @@
 package fr.hatari.mcp.it;
 
+import fr.hatari.mcp.EmulatorSession;
 import fr.hatari.mcp.Machine;
+import fr.hatari.mcp.McpJson;
 import fr.hatari.mcp.Options;
+import fr.hatari.mcp.ToolCatalog;
 import fr.hatari.mcp.ffm.HatariCore;
+import fr.hatari.mcp.keymap.StScancodes;
+import fr.hatari.mcp.tools.DebugTools;
+import fr.hatari.mcp.tools.InputTools;
+import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
+import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
+import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import org.junit.jupiter.api.*;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -134,9 +145,15 @@ class CoreIT {
     @Order(7)
     void breakpointListingMatchesParser() {
         core.debugCommand("b pc = $E00000");
-        int pos = fr.hatari.mcp.tools.DebugTools.positionOf(core, "pc = $E00000");
-        core.debugCommand("b " + pos);
-        assertTrue(pos >= 1, "listing non reconnu : " + core.debugCommand("b"));
+        try {
+            int pos = DebugTools.positionOf(core, "pc = $E00000");
+            // Message paresseux : le listing ne doit pas etre relu (ni "b -1" envoye)
+            // quand l'assertion passe.
+            assertTrue(pos >= 1, () -> "listing non reconnu : " + core.debugCommand("b"));
+        } finally {
+            int pos = DebugTools.positionOf(core, "pc = $E00000");
+            if (pos >= 1) core.debugCommand("b " + pos);
+        }
     }
 
     /**
@@ -144,16 +161,72 @@ class CoreIT {
      * avancer l'"early console" et donc changer l'affichage. Fait un reset
      * (donc apres les tests qui detournent PC/RAM) et remet la machine dans un
      * etat connu avant de presser la touche.
+     *
+     * <p>Temoin d'abord : sur la meme fenetre de trames, sans aucune touche,
+     * l'ecran doit rester identique. Sans ce controle, une animation propre a
+     * EmuTOS suffirait a faire passer l'assertion, meme sans le tap().
      */
     @Test
     @Order(300)
     void escapeKeyChangesScreen() {
+        // 244 trames apres un reset a froid : fenetre ou l'ecran d'accueil EmuTOS est
+        // stable sur les 62 trames suivantes (le temoin ci-dessous le verifie). Ailleurs
+        // pendant le boot, l'affichage change tout seul et le test ne prouverait rien.
+        final int settleFrames = 244;
+        final int holdFrames = 2;
+        final int gapFrames = 60;
+
         core.reset(true);
-        core.run(120);
+        core.run(settleFrames);
+        int[] idleBefore = core.frame().pixels();
+        core.run(holdFrames + gapFrames);
+        int[] idleAfter = core.frame().pixels();
+        assertArrayEquals(idleBefore, idleAfter,
+                "l'ecran d'accueil change tout seul : le test ne prouverait rien sur la touche");
+
+        core.reset(true);
+        core.run(settleFrames);
         int[] before = core.frame().pixels();
-        fr.hatari.mcp.tools.InputTools.tap(core, fr.hatari.mcp.keymap.StScancodes.ofName("ESC").orElseThrow(), 2, 60);
+        InputTools.tap(core, StScancodes.ofName("ESC").orElseThrow(), holdFrames, gapFrames);
         int[] after = core.frame().pixels();
-        assertFalse(java.util.Arrays.equals(before, after), "ESC n'a pas modifie l'ecran d'accueil EmuTOS");
+        assertFalse(Arrays.equals(before, after), "ESC n'a pas modifie l'ecran d'accueil EmuTOS");
+    }
+
+    /**
+     * clear_watchpoint par le chemin outil, contre le vrai Hatari : le watchpoint
+     * pose doit apparaitre dans le listing "b", puis en disparaitre apres l'appel
+     * a clear_watchpoint avec son id.
+     */
+    @Test
+    @Order(310)
+    void clearWatchpointRemovesItFromHatariListing() {
+        ToolCatalog catalog = new ToolCatalog(new EmulatorSession(core), McpJson.defaultMapper());
+
+        Map<String, Object> set = callTool(catalog, "set_watchpoint", Map.of("addr", "004000", "len", 2));
+        String expression = (String) set.get("expression");
+        assertTrue(DebugTools.positionOf(core, expression) >= 1,
+                () -> "watchpoint absent du listing Hatari : " + core.debugCommand("b"));
+
+        Map<String, Object> cleared = callTool(catalog, "clear_watchpoint", Map.of("id", set.get("id")));
+        assertEquals(true, cleared.get("ok"));
+
+        String listing = core.debugCommand("b");
+        assertEquals(-1, DebugTools.positionOf(core, expression), "watchpoint toujours la : " + listing);
+        assertFalse(listing.toLowerCase(java.util.Locale.ROOT).contains(expression.toLowerCase(java.util.Locale.ROOT)),
+                "expression encore presente dans le listing : " + listing);
+    }
+
+    /** Appelle un outil du catalogue et retourne son contenu structure. */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> callTool(ToolCatalog catalog, String name, Map<String, Object> args) {
+        for (SyncToolSpecification spec : catalog.all()) {
+            if (spec.tool().name().equals(name)) {
+                CallToolResult r = spec.callHandler().apply(null, new CallToolRequest(name, args));
+                assertNotEquals(Boolean.TRUE, r.isError(), () -> "erreur : " + r.content());
+                return (Map<String, Object>) r.structuredContent();
+            }
+        }
+        throw new AssertionError("outil absent : " + name);
     }
 
 }
