@@ -10,6 +10,9 @@ import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalInt;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /** Outils de contrôle de la machine : ping, état, reset, exécution. */
 public final class MachineTools {
@@ -39,6 +42,36 @@ public final class MachineTools {
         return out;
     }
 
+    /**
+     * Finds the position (line number) of a breakpoint in Hatari's listing output.
+     * Hatari format: "{N} conditional CPU breakpoints:\n" then lines like "   1:\tpc = $e00d98 :once\n"
+     * Compares the expression case-insensitively, ignoring :once/:N suffixes.
+     *
+     * @param listing the output of debugCommand("b")
+     * @param expression the breakpoint expression to find (e.g., "pc = $E00D98")
+     * @return the position (1-based) if found, empty otherwise
+     */
+    public static OptionalInt breakpointPosition(String listing, String expression) {
+        Pattern linePattern = Pattern.compile("^\\s*(\\d+):\\t(.*)$", Pattern.MULTILINE);
+        Matcher m = linePattern.matcher(listing);
+        String normalized = normalizeExpression(expression);
+        while (m.find()) {
+            String pos = m.group(1);
+            String expr = m.group(2);
+            if (normalizeExpression(expr).equals(normalized)) {
+                return OptionalInt.of(Integer.parseInt(pos));
+            }
+        }
+        return OptionalInt.empty();
+    }
+
+    /** Normalize expression: lowercase, strip :once and :N suffixes. */
+    private static String normalizeExpression(String expr) {
+        return expr.toLowerCase()
+                .replaceAll("\\s+:(?:once|\\d+)\\s*$", "")
+                .trim();
+    }
+
     private SyncToolSpecification ping() {
         return tools.tool("ping", "Vérifie que le serveur et la machine émulée répondent.",
                 "{\"type\":\"object\",\"properties\":{}}",
@@ -66,7 +99,9 @@ public final class MachineTools {
                     return session.read(m -> {
                         m.reset(cold);
                         Machine.RunResult r = m.run(1);
-                        return runReport(m, r);
+                        Map<String, Object> out = runReport(m, r);
+                        out.put("cold", cold);
+                        return out;
                     });
                 });
     }
@@ -91,10 +126,22 @@ public final class MachineTools {
                     int pc = args.hex("pc");
                     int max = args.intVal("max_frames", DEFAULT_MAX_FRAMES);
                     return session.read(m -> {
-                        m.debugCommand("b pc = $" + Fmt.hex24(pc) + " :once");
+                        String expr = "pc = $" + Fmt.hex24(pc);
+                        m.debugCommand("b " + expr + " :once");
                         Machine.RunResult r = m.run(max);
+                        boolean reached = r.reason() == Machine.StopReason.BREAKPOINT;
+
+                        // Clean up stale :once breakpoint if timeout (not reached)
+                        if (!reached) {
+                            String listing = m.debugCommand("b");
+                            OptionalInt pos = breakpointPosition(listing, expr);
+                            if (pos.isPresent()) {
+                                m.debugCommand("b " + pos.getAsInt());
+                            }
+                        }
+
                         Map<String, Object> out = runReport(m, r);
-                        out.put("reached", r.reason() == Machine.StopReason.BREAKPOINT);
+                        out.put("reached", reached);
                         return out;
                     });
                 });

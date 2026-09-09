@@ -1,16 +1,20 @@
 package fr.hatari.mcp;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /** Machine factice : mémoire 16 Mo lazy, registres, journal des appels. */
 public class FakeMachine implements Machine {
     public final byte[] ram = new byte[0x100000];
     public final long[] regs = new long[20];
     public final List<String> calls = new ArrayList<>();
+    public final Map<Integer, String> breakpoints = new LinkedHashMap<>();
     public long vbl;
     public StopReason nextStop = StopReason.NONE;
     public String debugOutput = "";
+    private int nextBreakpointId = 1;
 
     @Override public RunResult run(int maxFrames) {
         calls.add("run " + maxFrames);
@@ -32,7 +36,33 @@ public class FakeMachine implements Machine {
     @Override public void writeMemory(int addr, byte[] data) { System.arraycopy(data, 0, ram, addr, data.length); }
     @Override public Registers registers() { return new Registers(regs.clone()); }
     @Override public void setRegister(String name, long value) { calls.add("reg " + name + "=" + value); }
-    @Override public String debugCommand(String cmd) { calls.add("dbg " + cmd); return debugOutput; }
+    @Override public String debugCommand(String cmd) {
+        calls.add("dbg " + cmd);
+        if (cmd.equals("b")) {
+            // List breakpoints in Hatari format
+            if (breakpoints.isEmpty()) {
+                return "0 conditional CPU breakpoints:\n";
+            }
+            StringBuilder sb = new StringBuilder();
+            sb.append(breakpoints.size()).append(" conditional CPU breakpoints:\n");
+            for (Map.Entry<Integer, String> e : breakpoints.entrySet()) {
+                sb.append(String.format("%4d:\t%s\n", e.getKey(), e.getValue()));
+            }
+            return sb.toString();
+        } else if (cmd.startsWith("b ") && !cmd.contains("=")) {
+            // Remove breakpoint by position
+            try {
+                int pos = Integer.parseInt(cmd.substring(2).trim());
+                breakpoints.remove(pos);
+            } catch (NumberFormatException ignore) {}
+        } else if (cmd.startsWith("b ")) {
+            // Add breakpoint: "b pc = $E00D98 :once" or similar
+            String expr = cmd.substring(2);
+            breakpoints.put(nextBreakpointId, expr);
+            nextBreakpointId++;
+        }
+        return debugOutput;
+    }
     @Override public String disassemble(int addr, int count) { return String.format("$%06x : jmp $1100\n", addr); }
     @Override public Frame frame() { return new Frame(320, 200, new int[320 * 200]); }
     @Override public void key(int scancode, boolean press) { calls.add("key " + scancode + " " + press); }
