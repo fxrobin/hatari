@@ -31,6 +31,7 @@ const char DebugApi_fileid[] = "Hatari debug_api.c";
 #include "sysdeps.h"
 #include "newcpu.h"
 #include "video.h"
+#include "68kDisass.h"
 #include "debug_api.h"
 
 static int stopReason = HATARI_STOP_NONE;
@@ -216,5 +217,103 @@ int hatari_step(int steps)
 		return -1;
 	DebugCpu_SetSteps(steps);
 	DebugCpu_SetDebugging();
+	return 0;
+}
+
+
+/*-----------------------------------------------------------------------*/
+/**
+ * Capture what a function writes to debugOutput into out[outlen].
+ * Returns false if the memory stream could not be created.
+ */
+static bool DebugApi_CaptureOutput(void (*fn)(void *), void *arg, char *out, size_t outlen)
+{
+	FILE *saved = debugOutput;
+	char *buf = NULL;
+	size_t buflen = 0;
+	FILE *ms;
+
+	ms = open_memstream(&buf, &buflen);
+	if (!ms)
+		return false;
+	debugOutput = ms;
+	fn(arg);
+	fflush(ms);
+	debugOutput = saved;
+	fclose(ms);
+
+	if (outlen > 0)
+	{
+		size_t n = buflen < outlen - 1 ? buflen : outlen - 1;
+		memcpy(out, buf, n);
+		out[n] = '\0';
+	}
+	free(buf);
+	return true;
+}
+
+/* Result of the last DebugUI_ParseLine() call run through
+ * DebugApi_CaptureOutput(), consumed right away by hatari_dbg_command(). */
+static int lastCmdDone;
+
+/**
+ * DebugApi_CaptureOutput() callback running one debugger command line.
+ * Passed through a struct rather than a bare cast, so the const-ness of
+ * the caller's command string is never discarded.
+ */
+static void DebugApi_RunCommand(void *arg)
+{
+	const char *const *cmd = arg;
+
+	lastCmdDone = DebugUI_ParseLine(*cmd) ? 0 : 1;
+}
+
+/**
+ * Execute a Hatari debugger command and capture its output.
+ * Returns 0 if the command completed, 1 if it asked to resume emulation
+ * (e.g. "c"), -1 on capture failure.
+ */
+int hatari_dbg_command(const char *cmd, char *out, size_t outlen)
+{
+	if (!DebugApi_CaptureOutput(DebugApi_RunCommand, &cmd, out, outlen))
+		return -1;
+	return lastCmdDone;
+}
+
+
+/* Parameters and result of a Disasm() call run through
+ * DebugApi_CaptureOutput(), consumed right away by hatari_disasm(). */
+typedef struct
+{
+	uint32_t addr;
+	int count;
+	uint32_t next;
+} disasm_req_t;
+
+/**
+ * DebugApi_CaptureOutput() callback disassembling req->count instructions.
+ */
+static void DebugApi_RunDisasm(void *arg)
+{
+	disasm_req_t *req = arg;
+	uaecptr next = req->addr;
+
+	Disasm(debugOutput, (uaecptr)req->addr, &next, req->count);
+	req->next = next;
+}
+
+/**
+ * Disassemble count instructions starting at addr into out, and report
+ * the address following the last decoded instruction in *next_pc (unless
+ * NULL). Returns 0 on success, -1 on capture failure.
+ */
+int hatari_disasm(uint32_t addr, int count, char *out, size_t outlen, uint32_t *next_pc)
+{
+	disasm_req_t req = { addr, count, addr };
+
+	if (!DebugApi_CaptureOutput(DebugApi_RunDisasm, &req, out, outlen))
+		return -1;
+	if (next_pc)
+		*next_pc = req.next;
 	return 0;
 }

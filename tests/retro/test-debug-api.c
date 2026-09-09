@@ -84,6 +84,8 @@ int main(int argc, char *argv[])
 	void (*regs_get)(uint32_t *) = sym("hatari_regs_get");
 	int (*reg_set)(const char *, uint32_t) = sym("hatari_reg_set");
 	int (*step)(int) = sym("hatari_step");
+	int (*dbg)(const char *, char *, size_t) = sym("hatari_dbg_command");
+	int (*disasm)(uint32_t, int, char *, size_t, uint32_t *) = sym("hatari_disasm");
 
 	set_env(env_cb);
 	set_video(video_cb);
@@ -157,6 +159,43 @@ int main(int argc, char *argv[])
 	printf("step 3: reason=%d done=%d\n", reason, done);
 	CHECK(reason == 2);
 	CHECK(done <= 1);
+
+	/*
+	 * Breakpoint via debugger command, then run until it triggers.
+	 * BreakCond_Command() (src/debug/breakcond.c) reports what it did
+	 * with fprintf(stderr, ...) directly, not through debugOutput, so
+	 * 'out' stays empty here: hatari_dbg_command()'s return value and
+	 * the resulting breakpoint hit are what this checks.
+	 */
+	char out[4096];
+	CHECK(dbg("b pc = $1100", out, sizeof(out)) == 0);
+
+	CHECK(run(100, &reason, &done) == 0);
+	printf("bp: reason=%d done=%d\n", reason, done);
+	CHECK(reason == 1);
+	regs_get(r);
+	CHECK(r[16] == FAKE_TOS_LOOP);
+
+	/* remove it and check the next run() resumes normally */
+	CHECK(dbg("b 1", out, sizeof(out)) == 0);
+	CHECK(run(5, &reason, &done) == 0);
+	CHECK(reason == 0 && done == 5);
+
+	/*
+	 * "d" (disassemble) does write through debugOutput (debugcpu.c), so
+	 * this exercises hatari_dbg_command()'s output capture for real.
+	 * It returns DEBUGGER_CMDCONT (repeatable command), hence 1, not 0.
+	 */
+	CHECK(dbg("d $1100", out, sizeof(out)) == 1);
+	printf("d $1100:\n%s", out);
+	CHECK(strstr(out, "bra") != NULL || strstr(out, "BRA") != NULL);
+
+	/* disassembly via hatari_disasm() directly */
+	uint32_t next = 0;
+	CHECK(disasm(FAKE_TOS_LOOP, 2, out, sizeof(out), &next) == 0);
+	printf("disasm:\n%s", out);
+	CHECK(strstr(out, "bra") != NULL || strstr(out, "BRA") != NULL);
+	CHECK(next > FAKE_TOS_LOOP);
 
 	printf("All debug-api tests finished successfully.\n");
 	deinit();
