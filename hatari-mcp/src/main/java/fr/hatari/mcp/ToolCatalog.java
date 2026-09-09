@@ -1,6 +1,7 @@
 package fr.hatari.mcp;
 
 import fr.hatari.mcp.tools.MachineTools;
+import fr.hatari.mcp.tools.MemoryTools;
 import io.modelcontextprotocol.json.McpJsonMapper;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 
@@ -11,15 +12,18 @@ import java.util.List;
 public final class ToolCatalog {
 
     private final MachineTools machineTools;
+    private final MemoryTools memoryTools;
 
     public ToolCatalog(EmulatorSession session, McpJsonMapper mapper) {
         Tools tools = new Tools(mapper);
         this.machineTools = new MachineTools(session, tools);
+        this.memoryTools = new MemoryTools(session, tools);
     }
 
     public List<SyncToolSpecification> all() {
         List<SyncToolSpecification> list = new ArrayList<>();
         list.addAll(machineTools.specs());
+        list.addAll(memoryTools.specs());
         return list;
     }
 }
