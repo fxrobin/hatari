@@ -1,5 +1,7 @@
 package fr.hatari.mcp;
 
+import fr.hatari.mcp.video.VideoRecorder;
+
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -10,10 +12,15 @@ import java.util.function.Function;
 public final class EmulatorSession implements AutoCloseable {
 
     private final Object lock = new Object();
-    private final Machine machine;
+    private final CapturingMachine machine;
 
     public EmulatorSession(Machine machine) {
-        this.machine = machine;
+        this.machine = new CapturingMachine(machine);
+    }
+
+    /** Capture vidéo de la session (alimentée par tout outil qui fait avancer la machine). */
+    public VideoRecorder recorder() {
+        return machine.recorder();
     }
 
     public <T> T read(Function<Machine, T> fn) {

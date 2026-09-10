@@ -110,11 +110,23 @@ pour le schéma JSON complet de chacun).
 ### Vidéo (`VideoTools`)
 
 - `screenshot` — `{"path": "/tmp/hatari.png"}` (`path` optionnel)
+- `arm_video_capture` — `{"path": "/tmp/hatari.mp4", "every": 2, "scale": 2}` :
+  dès lors, tout outil qui fait avancer la machine filme une image toutes les
+  `every` trames (défaut 2 → 25 img/s, vitesse réelle) ; MP4 H.264 sans son,
+  encodé par `ffmpeg` (requis sur le PATH). Une seule capture à la fois.
+- `stop_video_capture` — `{}` : finalise le MP4 (idempotent), retourne
+  `path`, `frames`, `seconds`, `bytes`.
+- `video_capture_status` — `{}`
 
-### Clavier (`InputTools`)
+### Clavier et joystick (`InputTools`)
 
 - `press_key` — `{"key": "RETURN", "hold_frames": 2}`
 - `type_keys` — `{"text": "dir\n", "hold_frames": 2, "gap_frames": 1}`
+- `set_joystick` — `{"port": 1, "up": true, "fire": true}` : état maintenu
+  jusqu'au prochain appel ; `{}` relâche tout (port 1 = port jeu, défaut)
+- `press_joystick` — `{"fire": true, "frames": 4}` : impulsion puis relâche.
+  Certains jeux (Xenon 2) exigent un front sur fire : préférer les impulsions
+  à un fire maintenu.
 
 ### Disquettes (`DiskTools`)
 
