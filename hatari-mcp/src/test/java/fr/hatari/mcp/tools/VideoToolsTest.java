@@ -99,6 +99,9 @@ class VideoToolsTest {
         Map<String, Object> armed = callTool("arm_video_capture", Map.of("path", out, "every", 2, "scale", 1));
         assertEquals(true, armed.get("armed"));
         assertEquals(25, ((Number) armed.get("fps")).intValue());
+        assertEquals(true, armed.get("audio"));
+        // le son arrive par l'upcall du cœur : simulé ici
+        fake.audioListener.samples(new short[882 * 2 * 20]);
         rawCall("run_frames", Map.of("n", 20));
         Map<String, Object> st = callTool("video_capture_status", Map.of());
         assertEquals(true, st.get("active"));
@@ -110,7 +113,9 @@ class VideoToolsTest {
         // idempotent
         assertEquals(stop, callTool("stop_video_capture", Map.of()));
         // réarmable après arrêt
-        callTool("arm_video_capture", Map.of("path", dir.resolve("cap2.mp4").toString()));
+        Map<String, Object> muted = callTool("arm_video_capture",
+                Map.of("path", dir.resolve("cap2.mp4").toString(), "every", 4));
+        assertEquals(false, muted.get("audio"), "every > 2 coupe le son");
         callTool("stop_video_capture", Map.of());
     }
 }

@@ -9,10 +9,19 @@ import fr.hatari.mcp.video.VideoRecorder;
  */
 public final class CapturingMachine implements Machine {
 
-    private final Machine inner;
-    private final VideoRecorder recorder = new VideoRecorder();
+    /** Fréquence CPU d'un ST/STE PAL (clocks_timings.c), défaut quand elle n'est pas fournie. */
+    public static final long CPU_HZ_ST = 8_021_247L;
 
-    public CapturingMachine(Machine inner) { this.inner = inner; }
+    private final Machine inner;
+    private final VideoRecorder recorder;
+
+    public CapturingMachine(Machine inner) { this(inner, CPU_HZ_ST); }
+
+    public CapturingMachine(Machine inner, long cpuHz) {
+        this.inner = inner;
+        this.recorder = new VideoRecorder(cpuHz);
+        inner.onAudio(recorder::audio);
+    }
 
     public VideoRecorder recorder() { return recorder; }
 
@@ -41,6 +50,7 @@ public final class CapturingMachine implements Machine {
     @Override public String debugCommand(String cmd) { return inner.debugCommand(cmd); }
     @Override public String disassemble(int addr, int count) { return inner.disassemble(addr, count); }
     @Override public Frame frame() { return inner.frame(); }
+    @Override public void onAudio(fr.hatari.mcp.video.AudioListener l) { inner.onAudio(l); }
     @Override public void key(int scancode, boolean press) { inner.key(scancode, press); }
     @Override public void joystick(int port, int mask) { inner.joystick(port, mask); }
     @Override public void insertDisk(int drive, String path) { inner.insertDisk(drive, path); }

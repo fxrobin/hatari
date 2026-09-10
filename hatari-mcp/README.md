@@ -110,12 +110,16 @@ pour le schéma JSON complet de chacun).
 ### Vidéo (`VideoTools`)
 
 - `screenshot` — `{"path": "/tmp/hatari.png"}` (`path` optionnel)
-- `arm_video_capture` — `{"path": "/tmp/hatari.mp4", "every": 2, "scale": 2}` :
+- `arm_video_capture` — `{"path": "/tmp/hatari.mp4", "every": 2, "scale": 2, "audio": true}` :
   dès lors, tout outil qui fait avancer la machine filme une image toutes les
-  `every` trames (défaut 2 → 25 img/s, vitesse réelle) ; MP4 H.264 sans son,
-  encodé par `ffmpeg` (requis sur le PATH). Une seule capture à la fois.
-- `stop_video_capture` — `{}` : finalise le MP4 (idempotent), retourne
-  `path`, `frames`, `seconds`, `bytes`.
+  `every` trames (défaut 2 → 25 img/s) et enregistre le son du cœur (YM2149,
+  DMA STE) ; MP4 H.264 + AAC encodé par `ffmpeg` (requis sur le PATH). La vidéo
+  est recalée sur le temps réel émulé mesuré en cycles CPU (`-itsscale`), donc
+  synchrone avec le son même quand la machine tourne à 60 ou 71 Hz. `every > 2`
+  (accéléré) coupe le son. Une seule capture à la fois.
+- `stop_video_capture` — `{}` : multiplexe et finalise le MP4 (idempotent),
+  retourne `path`, `frames`, `seconds`, `audio_seconds`, `bytes`,
+  `video_time_scale`.
 - `video_capture_status` — `{}`
 
 ### Clavier et joystick (`InputTools`)

@@ -175,6 +175,9 @@ public final class HatariCore implements Machine {
     }
 
     @Override
+    public void onAudio(fr.hatari.mcp.video.AudioListener listener) { RetroCallbacks.setAudioListener(listener); }
+
+    @Override
     public void joystick(int port, int mask) {
         if (port < 0 || port > 1) throw new IllegalArgumentException("port joystick invalide : " + port);
         RetroCallbacks.setJoystick(port ^ 1, mask); // le core echange les ports 0 et 1

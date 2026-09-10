@@ -21,6 +21,11 @@ final class RetroCallbacks {
      */
     private static final int[] joyState = new int[2];
 
+    /** Récepteur des échantillons audio (null = son ignoré). */
+    private static volatile fr.hatari.mcp.video.AudioListener audioListener;
+
+    static void setAudioListener(fr.hatari.mcp.video.AudioListener l) { audioListener = l; }
+
     static void setJoystick(int retroPort, int mask) { joyState[retroPort] = mask; }
 
     final MemorySegment env, video, audio, audioBatch, inputPoll, inputState;
@@ -57,7 +62,13 @@ final class RetroCallbacks {
 
     static void videoCb(MemorySegment data, int w, int h, long pitch) {}
     static void audioCb(short l, short r) {}
-    static long audioBatchCb(MemorySegment d, long frames) { return frames; }
+    static long audioBatchCb(MemorySegment d, long frames) {
+        fr.hatari.mcp.video.AudioListener l = audioListener;
+        if (l != null && frames > 0) {
+            l.samples(d.reinterpret(frames * 2 * Short.BYTES).toArray(ValueLayout.JAVA_SHORT));
+        }
+        return frames;
+    }
     static void inputPollCb() {}
     static short inputStateCb(int port, int dev, int idx, int id) {
         if (dev != DEVICE_JOYPAD || port < 0 || port >= joyState.length) return 0;

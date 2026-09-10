@@ -64,6 +64,8 @@ public class FakeMachine implements Machine {
     }
     @Override public String disassemble(int addr, int count) { return String.format("$%06x : jmp $1100\n", addr); }
     @Override public Frame frame() { return new Frame(320, 200, new int[320 * 200]); }
+    public fr.hatari.mcp.video.AudioListener audioListener;
+    @Override public void onAudio(fr.hatari.mcp.video.AudioListener l) { audioListener = l; }
     @Override public void key(int scancode, boolean press) { calls.add("key " + scancode + " " + press); }
     @Override public void joystick(int port, int mask) { calls.add("joystick " + port + " " + mask); }
     @Override public void insertDisk(int drive, String path) { calls.add("insert " + drive + " " + path); }

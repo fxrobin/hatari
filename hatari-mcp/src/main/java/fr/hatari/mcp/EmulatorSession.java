@@ -15,7 +15,12 @@ public final class EmulatorSession implements AutoCloseable {
     private final CapturingMachine machine;
 
     public EmulatorSession(Machine machine) {
-        this.machine = new CapturingMachine(machine);
+        this(machine, CapturingMachine.CPU_HZ_ST);
+    }
+
+    /** @param cpuHz fréquence du CPU émulé (base de temps de la capture vidéo) */
+    public EmulatorSession(Machine machine, long cpuHz) {
+        this.machine = new CapturingMachine(machine, cpuHz);
     }
 
     /** Capture vidéo de la session (alimentée par tout outil qui fait avancer la machine). */

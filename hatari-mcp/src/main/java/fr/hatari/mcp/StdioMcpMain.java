@@ -57,7 +57,7 @@ public final class StdioMcpMain {
         var transport = new StdioServerTransportProvider(mapper, in, protocolOut);
 
         Options options = Options.parse(args);
-        EmulatorSession session = new EmulatorSession(fr.hatari.mcp.ffm.HatariCore.open(options));
+        EmulatorSession session = new EmulatorSession(fr.hatari.mcp.ffm.HatariCore.open(options), options.cpuHz());
         Runtime.getRuntime().addShutdownHook(new Thread(session::close));
 
         ToolCatalog catalog = new ToolCatalog(session, mapper);
