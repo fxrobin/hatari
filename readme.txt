@@ -286,6 +286,11 @@ Their main run-time dependencies are:
   - gui-win/ -- MS Windows console code + icon
   - includes/ -- C-source prototypes, enumerations etc
   - sdl/ -- (most of the) SDL specific Hatari code
+* src/retro/ -- libretro core + hatari_* debug/automation API used by hatari-mcp/
+* hatari-mcp/ -- MCP (Model Context Protocol) stdio server in Java driving the
+  emulator through src/retro/ (FFM binding, no subprocess): run/step control,
+  memory/registers, breakpoints, inputs, screenshots, scripted runs.
+  See hatari-mcp/README.md for architecture and tools
 * tests/ -- shell/python scripts & programs for testing emulator functionality
   - See tests/readme.txt for details
 * tools/ -- shell/python scripts & programs useful with Hatari
