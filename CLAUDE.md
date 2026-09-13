@@ -92,3 +92,10 @@ Serveur MCP stdio Java (`hatari-mcp/`, JDK 25, FFM) qui charge `build/src/libret
 - Java : `export JAVA_HOME=~/.sdkman/candidates/java/25.0.4-tem` puis `cd hatari-mcp && mvn test` (les tests `*IT` utilisent la vraie `.so` et `~/.hatari/tos.img`, ignorés si absents).
 - Lancement : `hatari-mcp/scripts/hatari-mcp.sh` (déclaré dans `.mcp.json`). Smoke : `hatari-mcp/scripts/smoke.sh`.
 - Spec et plan : `docs/superpowers/specs/2026-09-08-hatari-mcp-design.md`, `docs/superpowers/plans/2026-09-08-hatari-mcp.md`.
+
+## Xenon 2 (rétro-ingénierie)
+
+`xenon-2-findings.md` (racine) consigne tout ce qui est établi sur Xenon 2 Megablast
+(recette de boot, carte mémoire, formats tilemap/tuiles/fond/sprites, adresses des
+routines, méthode). **Mettre ce fichier à jour à chaque nouvelle trouvaille stable**
+(adresse, format, routine, comportement confirmé), pas les hypothèses en cours.

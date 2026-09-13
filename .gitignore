@@ -47,3 +47,6 @@ Debug/*
 
 # Images TOS / disquettes sous copyright (tests locaux hatari-mcp)
 resources/
+
+# Cache local d'indexation (memsearch)
+.memsearch/

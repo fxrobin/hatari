@@ -79,4 +79,43 @@ class VideoToolsTest {
         assertEquals(320, img.getWidth());
         assertEquals(200, img.getHeight());
     }
+
+    @Test
+    void videoCaptureStatusBeforeArmIsAnError() {
+        for (SyncToolSpecification spec : catalog.all()) {
+            if (spec.tool().name().equals("video_capture_status")) {
+                CallToolResult r = spec.callHandler().apply(null, new CallToolRequest("video_capture_status", Map.of()));
+                assertEquals(Boolean.TRUE, r.isError());
+                return;
+            }
+        }
+        throw new AssertionError("outil absent : video_capture_status");
+    }
+
+    @Test
+    @org.junit.jupiter.api.condition.EnabledIf("fr.hatari.mcp.video.FfmpegSinkTest#ffmpegAvailable")
+    void armRunStopProducesAnMp4(@TempDir Path dir) throws Exception {
+        String out = dir.resolve("cap.mp4").toString();
+        Map<String, Object> armed = callTool("arm_video_capture", Map.of("path", out, "every", 2, "scale", 1));
+        assertEquals(true, armed.get("armed"));
+        assertEquals(25, ((Number) armed.get("fps")).intValue());
+        assertEquals(true, armed.get("audio"));
+        // le son arrive par l'upcall du cœur : simulé ici
+        fake.audioListener.samples(new short[882 * 2 * 20]);
+        rawCall("run_frames", Map.of("n", 20));
+        Map<String, Object> st = callTool("video_capture_status", Map.of());
+        assertEquals(true, st.get("active"));
+        assertEquals(10, ((Number) st.get("frames")).intValue());
+        Map<String, Object> stop = callTool("stop_video_capture", Map.of());
+        assertEquals(false, stop.get("active"));
+        assertTrue(((Number) stop.get("bytes")).longValue() > 0);
+        assertTrue(java.nio.file.Files.exists(Path.of(out)));
+        // idempotent
+        assertEquals(stop, callTool("stop_video_capture", Map.of()));
+        // réarmable après arrêt
+        Map<String, Object> muted = callTool("arm_video_capture",
+                Map.of("path", dir.resolve("cap2.mp4").toString(), "every", 4));
+        assertEquals(false, muted.get("audio"), "every > 2 coupe le son");
+        callTool("stop_video_capture", Map.of());
+    }
 }

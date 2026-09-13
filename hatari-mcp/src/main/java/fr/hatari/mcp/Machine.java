@@ -49,7 +49,16 @@ public interface Machine {
     String disassemble(int addr, int count);
 
     Frame frame();
+
+    /** Installe (ou retire avec {@code null}) le récepteur des échantillons audio du cœur. */
+    void onAudio(fr.hatari.mcp.video.AudioListener listener);
     void key(int scancode, boolean press);
+
+    /** Bits d'état d'un joystick ST : directions en bits 0-3, fire en bit 7 (convention IKBD). */
+    int JOY_UP = 0x01, JOY_DOWN = 0x02, JOY_LEFT = 0x04, JOY_RIGHT = 0x08, JOY_FIRE = 0x80;
+
+    /** Fixe l'état du joystick du port ST 0 ou 1 (masque {@code JOY_*}) ; tenu jusqu'au prochain appel. */
+    void joystick(int port, int mask);
     void insertDisk(int drive, String path);
     void ejectDisk(int drive);
 
