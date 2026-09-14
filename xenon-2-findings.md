@@ -113,11 +113,14 @@ Les couleurs 0–3 (noir, gris sombre, brun, orange) sont celles du fond 2 plans
   `h01`–`h10` = handlers numérotés quand les descripteurs sont lisibles, sinon
   `a<adresse>` + `tirs` pour `$4F028`), cases bordées et espacées, frames en
   ordre d'animation. Restes non attribués : chaînes (même hauteur, gap ≤ 30 o,
-  ex. boss `x540FE`) et `divers`. Runs absorbant 1–2 lignes inter-records
-  resserrés à H+1 (L1 : 114, L2 : 100, L3 : 109, L4 : 86, L5 : 110), clampés à
-  leur banque ; records pointés sans run couvrante secourus (ex. tirs L4
-  `$59F94`, poissons 32 px). Les décalages de grille de 6–8 o entre sprites
-  consécutifs sont normaux (en-têtes intercalés), pas des crops cassés.
+  ex. boss `x540FE`) et `divers`. Runs resserrés à H+1 (en-têtes `[xoff,yoff,W,H]`
+  quelconques, ex. vase L1 `spr_53630` : `[-1,0,14,15]` → 16, sa dernière ligne
+  absorbait l'en-tête suivant) ou étendus aux queues vides-transparentes/cohérentes
+  (jeu dessine sans skip : icônes 12→16 ; refus sur hostile/zéros opaques/banque/run
+  suivant). Records pointés sans run couvrante secourus (y compris larges à moitié
+  droite vide), luck-runs chevauchés supprimés (runs dans le span d'un record pointé).
+  Les décalages de grille de 6–8 o entre sprites consécutifs sont normaux
+  (en-têtes intercalés), pas des crops cassés.
 - Objets : liste chaînée de records ; `+0` type/flags (0 = libre), `+2` pointeur routine
   de dessin (`jsr (a1)`), `+6` seconde routine, `+$E`/`+$12` chaînage
   (`$3EC4`–`$3EEA` parcourent la liste). Le sprite courant est en A0 dans le blit.
@@ -144,7 +147,7 @@ Les couleurs 0–3 (noir, gris sombre, brun, orange) sont celles du fond 2 plans
   CSV de la tilemap, README, dump RAM `ram_dump_1MB.bin`, scripts Python de décodage
   et `x2rec.c` dans `tools/`, plus chaque élément en PNG RGBA individuel :
   `tiles/tile_<mot>.png` (176, suffixe `_masked`, alpha = fond visible) et
-   `sprites/{enemies_level,common,hud}/spr_<adresse>_<l>x<h>.png` (111 + 334 + 49)), `xenon2_level1_assets.zip`, images disque
+   `sprites/{enemies_level,common,hud}/spr_<adresse>_<l>x<h>.png` (110 + 334 + 49)), `xenon2_level1_assets.zip`, images disque
    `xenon2_disk1.stx` / `xenon2_disk2.stx`. Les scripts lisent `./ram.bin` (liens en place
    vers `ram_dump_1MB.bin`).
 
@@ -178,11 +181,11 @@ Les couleurs 0–3 (noir, gris sombre, brun, orange) sont celles du fond 2 plans
 
 | Niv. | Tilemap | Rangées | Banque tuiles | Tuiles utilisées | Base parallaxe | Sprites niveau | Palette |
 |---|---|---|---|---|---|---|---|
-| 1 | `$56D52`–`$59C34` | 300 | `$59C42`–`$638D2` | 176 | `$6989C` | `$4F000`–`$56D52` (111 : 10 types + tirs + chaînes + divers) | `0000 0111 0321 0631 …` |
-| 2 | `$5873E`–`$5B600` | 299 | `$5B60E`–`$6B99E` | 211 | `$6CE6C` | `$4F000`–`$5873E` (130) | `0000 0110 0320 0630 …` |
-| 3 | `$60898`–`$6375A` | 299 | `$63768`–`$6CF38` | 182 | `$6EC58` | `$4F000`–`$60898` (181) | `0000 0010 0221 0631 …` |
-| 4 | `$61CD8`–`$64B9A` | 299 | `$64BA8`–`$76638` | 351 | `$78248` | `$4F000`–`$61CD8` (188, dont tirs `$59F94` secourus) | `0000 0110 0320 0630 …` |
-| 5 | `$5D21A`–`$600DC` | 299 (21 vides en tête) | `$600EA`–`$6C03A` | 160 | `$73C38` | `$4F000`–`$5D21A` (189) | `0000 0101 0202 0303 …` |
+| 1 | `$56D52`–`$59C34` | 300 | `$59C42`–`$638D2` | 176 | `$6989C` | `$4F000`–`$56D52` (110 : types + tirs + chaînes + divers, 0 ptr non résolu) | `0000 0111 0321 0631 …` |
+| 2 | `$5873E`–`$5B600` | 299 | `$5B60E`–`$6B99E` | 211 | `$6CE6C` | `$4F000`–`$5873E` (131 ; reste `57EAE`) | `0000 0110 0320 0630 …` |
+| 3 | `$60898`–`$6375A` | 299 | `$63768`–`$6CF38` | 182 | `$6EC58` | `$4F000`–`$60898` (181 ; restes `30000`, `5CA0C`, `5BFF4`, `5D11C`, `54C1A`) | `0000 0010 0221 0631 …` |
+| 4 | `$61CD8`–`$64B9A` | 299 | `$64BA8`–`$76638` | 351 | `$78248` | `$4F000`–`$61CD8` (185, dont tirs `$59F94` secourus ; reste `40000`) | `0000 0110 0320 0630 …` |
+| 5 | `$5D21A`–`$600DC` | 299 (21 vides en tête) | `$600EA`–`$6C03A` | 160 | `$73C38` | `$4F000`–`$5D21A` (194 ; 0 ptr non résolu) | `0000 0101 0202 0303 …` |
 
 Les 12 couleurs hautes de la palette sont identiques dans les 5 niveaux (vaisseau, HUD).
 Les sprites communs (`$14000`–`$30000`, 334) et HUD (`$C000`–`$14000`, 49) ne changent pas.
@@ -195,11 +198,12 @@ Les sprites communs (`$14000`–`$30000`, 334) et HUD (`$C000`–`$14000`, 49) n
   (L1 complet, L2/L5 partiels) ; sinon attribution par scan des tables d'animation
   (`a<adresse>`) ; poissons 32 px décodés en planes-major. Reste non attribué : `divers`.
 - Limite : le scan ramène encore quelques faux positifs (bandes rayées = runs
-  « chanceuses » à travers code/tables, ex. `5F1AE`, `5E9CE`) et 1–3 ptrs d'animation
-  non résolus par niveau (lignes heuristiquement incohérentes sans en-tête lisible,
-  ex. `52C84`) ; les sprites < 8 lignes hors animations restent invisibles ;
-  le fond de la carte statique est une simulation du défilement de parallaxe
-  par blocs de 11 rangées.
+  « chanceuses » à travers code/tables, ex. `5F1AE`, `5E9CE`, conservées en divers
+  faute de preuve contraire) et une poignée de ptrs d'animation non résolus
+  (lignes hostiles sans en-tête lisible ; `30000`/`40000` = probables cases vides).
+  Reste sous revue manuelle (signalé, non appliqué) : `TRONCATURE FORTE`
+  (ex. `2B060`, `5E9CE`) et `TALLER?` (ex. `17EE6`). Le fond de la carte statique
+  est une simulation du défilement de parallaxe par blocs de 11 rangées.
 
 ## 9. Boot secteur (observé lors de la passe Hatari des skills)
 
