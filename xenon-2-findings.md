@@ -95,6 +95,21 @@ Les couleurs 0–3 (noir, gris sombre, brun, orange) sont celles du fond 2 plans
   méduses, petits vaisseaux, spawners avec frames d'ouverture) ; communs
   `$14000`–`$30000` ; HUD/police `$0C000`–`$14000`. Les frames d'une animation sont
   consécutives en mémoire.
+- Record sprite : en-tête 8 o `[t,t,W,W-1]` (t = type pareillé : 0, 2 ou 3 selon
+  banque/niveau ; W = hauteur vraie) + W lignes. A0 pointe l'EN-TÊTE, pas les
+  pixels : le blitter (`$10A2`, entrée/clip ; variantes `$1126`/`$1168`/`$11C6`/
+  `$11F4`/`$1222`) lit offsets/largeur/hauteur en `(a0)+` et boucle `dbra`
+  (W itérations) ; `$4F028` → `$546D6` = en-tête, lignes à `$546DE`. Le jeu dessine
+  toujours W lignes, sans skip : `dest = (dest & mask) | plan` (le plan gagne),
+  `mask=0` efface le fond puis OR, `mask=$FFFF` garde le fond (vérifié au
+  désassemblage capstone du dump).
+- Conséquence outillage (`ripall.py`) : les runs absorbent parfois 1–2 lignes
+  inter-records (crop = W+1/W+2) → resserrés à W sur en-tête valide
+  (L1 : 94, L2 : 88, L3 : 87, L4 : 81, L5 : 99), clampés à leur banque
+  (ex. HUD `$13F94` débordait de 6 lignes dans common), record pointé sans run
+  couvrante secouru (tirs L4 `$59F94` h=5, lignes heuristiquement incohérentes).
+  Les décalages de grille de 6–8 o entre sprites consécutifs sont normaux
+  (en-têtes intercalés), pas des crops cassés.
 - Objets : liste chaînée de records ; `+0` type/flags (0 = libre), `+2` pointeur routine
   de dessin (`jsr (a1)`), `+6` seconde routine, `+$E`/`+$12` chaînage
   (`$3EC4`–`$3EEA` parcourent la liste). Le sprite courant est en A0 dans le blit.
@@ -113,14 +128,16 @@ Les couleurs 0–3 (noir, gris sombre, brun, orange) sont celles du fond 2 plans
 - Scripts de décodage (Python/Pillow, scratchpad de session `rip/`) : vue « colonnes
   16 px », vue tuiles 128 o, recherche de période par autocorrélation d'octets, test
   de cohérence masque/plans, rendu de la carte identique au moteur (`level.py`).
-- Livrables produits le 2026-09-11, rangés dans `resources/xenon2/` (gitignoré) :
+- Livrables produits le 2026-09-11, régénérés le 2026-09-14 (crops resserrés par
+  en-tête, voir §6 ; doublons d'anciennes passes supprimés des dossiers et zips),
+  rangés dans `resources/xenon2/` (gitignoré) :
   `level1-assets/` (carte 320×4800, 176 tuiles, fond, 3 planches de sprites étiquetées,
   CSV de la tilemap, README, dump RAM `ram_dump_1MB.bin`, scripts Python de décodage
   et `x2rec.c` dans `tools/`, plus chaque élément en PNG RGBA individuel :
   `tiles/tile_<mot>.png` (176, suffixe `_masked`, alpha = fond visible) et
-  `sprites/{enemies_level1,common,hud}/spr_<adresse>_<l>x<h>.png` (104 + 334 + 49)), `xenon2_level1_assets.zip`, images disque
-  `xenon2_disk1.stx` / `xenon2_disk2.stx`. Les scripts lisent `./ram.bin` : copier ou
-  lier `ram_dump_1MB.bin` sous ce nom avant de les relancer.
+   `sprites/{enemies_level,common,hud}/spr_<adresse>_<l>x<h>.png` (104 + 334 + 49)), `xenon2_level1_assets.zip`, images disque
+   `xenon2_disk1.stx` / `xenon2_disk2.stx`. Les scripts lisent `./ram.bin` (liens en place
+   vers `ram_dump_1MB.bin`).
 
 ## 8. Niveaux : variable, table, chargement, saut direct
 
@@ -155,7 +172,7 @@ Les couleurs 0–3 (noir, gris sombre, brun, orange) sont celles du fond 2 plans
 | 1 | `$56D52`–`$59C34` | 300 | `$59C42`–`$638D2` | 176 | `$6989C` | `$4F000`–`$56D52` (104) | `0000 0111 0321 0631 …` |
 | 2 | `$5873E`–`$5B600` | 299 | `$5B60E`–`$6B99E` | 211 | `$6CE6C` | `$4F000`–`$5873E` (131) | `0000 0110 0320 0630 …` |
 | 3 | `$60898`–`$6375A` | 299 | `$63768`–`$6CF38` | 182 | `$6EC58` | `$4F000`–`$60898` (157) | `0000 0010 0221 0631 …` |
-| 4 | `$61CD8`–`$64B9A` | 299 | `$64BA8`–`$76638` | 351 | `$78248` | `$4F000`–`$61CD8` (170) | `0000 0110 0320 0630 …` |
+| 4 | `$61CD8`–`$64B9A` | 299 | `$64BA8`–`$76638` | 351 | `$78248` | `$4F000`–`$61CD8` (171, dont tirs `$59F94` secourus) | `0000 0110 0320 0630 …` |
 | 5 | `$5D21A`–`$600DC` | 299 (21 vides en tête) | `$600EA`–`$6C03A` | 160 | `$73C38` | `$4F000`–`$5D21A` (175) | `0000 0101 0202 0303 …` |
 
 Les 12 couleurs hautes de la palette sont identiques dans les 5 niveaux (vaisseau, HUD).
@@ -165,8 +182,11 @@ Les sprites communs (`$14000`–`$30000`, 334) et HUD (`$C000`–`$14000`, 49) n
   dans le dump et produit carte, tuiles, fond, sprites (planches + PNG RGBA individuels),
   CSV et README. Dumps et sorties : `resources/xenon2/level{1..5}-assets/`, archives
   `xenon2_level{1..5}_assets.zip` et `xenon2_all_levels_assets.zip`.
-- Limite : le scan de sprites du blob niveau ramène quelques faux positifs (bandes
-  rayées) ; le fond de la carte statique est une simulation du défilement de parallaxe
+- Limite : le scan ramène encore quelques faux positifs (bandes rayées = runs
+  « chanceuses » à travers code/tables, ex. `5F1AE`, `5E9CE` ; aucun regroupement
+  multi-bande ne se produit — les dessins larges sont assemblés côté moteur par
+  plusieurs objets 16 px) ; les sprites < 8 lignes sans en-tête restent invisibles ;
+  le fond de la carte statique est une simulation du défilement de parallaxe
   par blocs de 11 rangées.
 
 ## 9. Boot secteur (observé lors de la passe Hatari des skills)
