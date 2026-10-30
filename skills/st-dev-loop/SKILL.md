@@ -86,7 +86,14 @@ build/src/hatari --machine ste --tos none --fast-forward on --sound off \
 - `--tos none` : TOS factice interne (pas d'image TOS), suffit pour un PRG
   qui tape le matériel ; GEMDOS de base (Cconws, Fcreate/Fwrite) disponible —
   les tests `tests/cycles` y écrivent leurs résultats dans un fichier.
-  Pour un comportement TOS réel : `--tos ~/.hatari/tos206.img` (STE) ou EmuTOS.
+- **EmuTOS** (TOS libre, GPL) pour booter une disquette ou un bureau : images
+  officielles sur SourceForge (`emutos-192k-1.3.zip` → `etos192uk.img` pour
+  ST, `emutos-256k-1.3.zip` → `etos256uk.img` pour STE), pas sur GitHub ni
+  dans le paquet Ubuntu `hatari` (version dfsg). La version **UK démarre en
+  PAL 50 Hz** (vérifié, `info video`), la US en 60 Hz. Limite : les jeux
+  protégés qui dépendent du TOS Atari peuvent planter (Rick Dangerous, protégé
+  par Copylock, lève un bus error au boot sous EmuTOS 1.3) → `--tos` d'un TOS
+  Atari 1.0x.
 - `--machine st|ste|megaste` ; `--memsize` en Mo.
 - `--run-vbls N` : quitte après N VBL (tests). `--benchmark` : sans limite de
   vitesse. `--auto C:\\PROG.PRG` + `-d dossier` : lancer depuis un disque
@@ -178,6 +185,7 @@ dépôt :
 | `cycbench.s` | coût en cycles de séquences (64 copies déroulées, IRQ masquées, coût de mesure soustrait) ; ajouter un test = une macro `T "nom",label` + la routine |
 | `hwtest.s` | contrôles matériels STE (H1–H8) : `$FF820D`, palette `.b`, bus error joypad, Microwire, blitter, DMA son, Timer B, hscroll + linewidth |
 | `build.sh`, `run.sh` | assembler (Docker) / lancer sous Hatari sans écran |
+| `scenario_harness.c` | pilote le cœur libretro (celui du serveur MCP) sans Java : scénario daté en trames — `joy`, `key`, `poke`, `dump`, `shot` (PPM), `dbg <commande>`, `onstop <commande>` (sur point d'arrêt), `end` ; arguments Hatari après `--` (disquette, `--tos`, `--machine`) |
 
 ```sh
 cd skills/st-dev-loop/bench

@@ -13,6 +13,12 @@ question précise, déléguer à l'agent `st-game-analyst`.
 ## 0. Avant tout
 
 - Les findings existants répondent peut-être déjà (`xenon-2-findings.md`).
+- Pas d'image TOS Atari sous la main : EmuTOS UK (50 Hz) suffit souvent
+  (skill `st-dev-loop` §3), mais une protection peut exiger le vrai TOS. Pour
+  piloter sans le serveur MCP Java : `st-dev-loop/bench/scenario_harness.c`.
+- Secteur de boot : il est chargé à `_dskbufp` (`$4C6`, `$1004` sous EmuTOS) ;
+  somme des 256 mots = `$1234` s'il est exécutable. Le texte en clair donne
+  souvent la protection (ex. « Rob Northen Computing » = Copylock).
 - Noter les conditions : image disque exacte (STX/MSA/ST), machine
   (`--machine st|ste`), TOS (EmuTOS ou TOS réel), RAM, **50 ou 60 Hz**. Sous
   Hatari/EmuTOS le défaut est 60 Hz (`$FF820A` = 0) : un jeu PAL y tourne plus
