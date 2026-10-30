@@ -48,9 +48,10 @@ liens symboliques pour que Claude Code les découvre.
   Hatari bouge, revérifier par `grep`.
 - Un fait sur Xenon 2 va d'abord dans `xenon-2-findings.md` ; le patron
   réutilisable qu'on en tire va dans `st-game-engine`.
-- Limite connue : les exemples de code n'ont **pas** été assemblés ni exécutés
-  lors de la rédaction (pas d'assembleur 68000 ni de SDL dans l'environnement) ;
-  les recettes marquées *(déduit)* sont à confirmer sous Hatari. Les
-  programmes de référence exécutés par la CI de Hatari sont
-  `tests/screen/flixfull.s` (overscan, MFP, IKBD) et `tests/cycles/cyccheck.s`
-  (mesure de cycles).
+- **Vérification** : le banc `st-dev-loop/bench/` (GNU as via l'image Docker
+  `fxrobin/m68k-compiler`, Hatari compilé depuis ce dépôt) a mesuré le
+  tableau de cycles et validé les recettes STE marquées « vérifié » dans
+  `st-hardware/references/`. Restent non exécutés : les extraits marqués
+  *(déduit)*, le handler ACIA et le sprite blitter multi-passes. Programmes de
+  référence de la CI Hatari : `tests/screen/flixfull.s` (overscan, MFP,
+  IKBD) et `tests/cycles/cyccheck.s`.

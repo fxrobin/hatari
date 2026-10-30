@@ -19,8 +19,11 @@ mesure.
    `ikbd.c`, `acia.c`, `joy.c`, `m68000.c`, `includes/*.h`). Lire aussi le
    **journal daté** en tête du fichier (démo/jeu qui a motivé chaque fix).
    Distinguer le comportement du mode cycle-exact (CE) et du mode rapide.
-3. **Expérience** (si un binaire `build/src/hatari` et un assembleur 68000
-   sont disponibles ; skill `st-dev-loop`) :
+3. **Expérience** (skill `st-dev-loop`) : partir du banc
+   `skills/st-dev-loop/bench/` (`build.sh` = GNU as via l'image Docker
+   `fxrobin/m68k-compiler`, `run.sh` = Hatari sans écran ; Hatari se compile
+   avec `libsdl2-dev`). Ajouter un test à `cycbench.s` (cycles) ou un bloc
+   `Hn` à `hwtest.s` (comportement), ou :
    - petit PRG autonome sous `--tos none --machine ste` (ou `st`),
      `--run-vbls`, `--natfeats on` ; mesure par `NF_CYCLES`, résultat par
      `NF_STDERR` ou fichier GEMDOS ;

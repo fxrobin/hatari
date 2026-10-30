@@ -68,6 +68,12 @@ $FF8265 = fin
 $FF820F = (W - 160 - (fin ? 8 : 0)) / 2      ; en mots     (déduit)
 ```
 
+**Vérifié sous Hatari STE** (`bench/hwtest.s`, H8) : `$FF8265` = 5 et
+`$FF820F` = 76, puis `$FF8265` = 0 et `$FF820F` = 80 donnent tous deux un
+compteur vidéo à base + 10 × 320 après 10 lignes. Également vérifié (H1) :
+`$FF820D` relu `$46` puis `$00` après une écriture de `$FF8203` ; (H2)
+`move.b #7,$ffff8240.w` relu `$0707`.
+
 Écrire base + `$FF8265` + `$FF820F` pendant la VBL (avant la ligne 1 du haut
 d'écran). Changer `$FF820F` selon `fin` à chaque trame est indispensable :
 avec le prefetch, la ligne consomme 8 o de plus.

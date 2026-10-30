@@ -92,7 +92,7 @@ paquet.
 - Relire **`$FF9202`** : directions/boutons de la rangée, actifs à 0, pad A
   bits 8-11, pad B bits 12-15.
 - Lire **`$FF9200`** : feu/pause actifs à 0, pad A bits 0-1, pad B bits 2-3.
-  **Un accès `.b` à `$FF9200` = bus error** (joy.c:412-419) ; `$FF9201` en
-  `.b` est permis.
+  **Un accès `.b` à `$FF9200` = bus error** (joy.c:412-419, vérifié H3 :
+  `.w` passe, `.b` lève le bus error) ; `$FF9201` en `.b` est permis.
 - Paddles : `$FF9211/13/15/17`.
 - Absents du ST : bus error.

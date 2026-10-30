@@ -57,7 +57,8 @@ registres voulus :
         move.b  #%10000001,$21(a0)    ; $8921 : mono, 12517 Hz
         move.b  #1,1(a0)              ; PLAY, sans LOOP
 ```
-Vérifier sous Hatari avec `info dmasnd`. (Le raccourci `movep.l d0,1(a0)`
+Vérifié sous Hatari STE (`bench/hwtest.s`, H6) : début et fin relus
+identiques, ~625 octets joués en ~400 000 cycles (12 517 Hz). (Le raccourci `movep.l d0,1(a0)`
 écrit aussi l'octet haut de d0 dans `$8901`, le contrôle : à éviter si le son
 joue.)
 
@@ -69,8 +70,8 @@ joue.)
 - Transfert : 16 décalages × 8 cycles = **128 cycles (16 µs)** ; une
   écriture pendant un transfert est ignorée (dmaSnd.c:1033-1068, 1195-1206).
   Attendre que le masque relu revienne à sa valeur (`cmp.w #$07FF,$ffff8924.w`)
-  avant la commande suivante *(déduit : la relecture montre la valeur en
-  rotation pendant le transfert, dmaSnd.c:1061-1064)*.
+  avant la commande suivante. Vérifié sous Hatari STE (H4) : juste après
+  l'écriture, le masque se relit `$0FFE` (en rotation), puis la boucle sort.
 
 | CCC | Fonction | Valeurs |
 |---|---|---|

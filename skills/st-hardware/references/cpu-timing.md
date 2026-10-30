@@ -62,9 +62,19 @@ Sources : `src/includes/m68000.h` (commentaires détaillés et mesures),
 | `movem.l n regs,d16(An)` | 12+8n | | `movem.w (An)+,n regs` | 12+4n |
 | `movep.w` / `movep.l` | 16 / 24 | | `rte` | 20 |
 
-Valeurs du manuel Motorola arrondies selon la règle 1 ; en cas de doute,
-mesurer (skill `st-dev-loop` §6, ou le banc `tests/cycles/cyccheck.s` qui
-compare des séquences à des `nop`).
+Valeurs du manuel Motorola arrondies selon la règle 1. **Mesurées sous
+Hatari le 2026-10-30** (`--machine ste` et `st`, résultats identiques) par
+`skills/st-dev-loop/bench/cycbench.s` (64 copies déroulées, `NF_CYCLES`) :
+`nop` 4, `moveq` 4, `clr.l d0` 8, `exg` 8, `lsl.w #1` 8, `lsl.w #2` 12,
+`move.w 0(a4,d2.w),d1` 16, paire `lsl.w #4` + `d8(An,Xn)` 28, `exg`+`exg` 16
+(pas de pairing entre eux), `move.l (a0)+,(a1)+` 20, `move.l d0,(a0)+` 12,
+`clr.l (a0)+` 20, `lea 160(a0),a0` 8, `add.w #160,a0` 12,
+`movem.l d0-d7/a0-a5,-(a6)` 120, `movem.l (a0),d0-d7` 76,
+`movem.l d0-d7,(a1)` 72, `mulu` 40 (multiplicateur 0) à 72 (`$FFFF`),
+`bra.w` pris 12, `bne.s` non pris 8, `dbra` 12/16, `bsr`+`rts` 36,
+écriture palette `.w` 12 (`.l` 16), lecture MFP 16, écriture YM 16,
+`movep.w` YM 20, lecture ACIA 20 (12 + 6 + synchro E-clock). Pour toute autre
+instruction : ajouter une ligne au banc et relancer.
 
 ## Ordres de grandeur utiles
 
@@ -74,4 +84,4 @@ compare des séquences à des `nop`).
 - Copier 32 000 o par `movem.l` 13 registres (lecture + écriture `d16(An)`) :
   ~615 × 232 ≈ **143 000 cycles** (89 % d'une VBL).
 - 16 couleurs par `movem.l pal,d0-d7 ; movem.l d0-d7,$ffff8240.w` :
-  80 (`d16(PC)`) + 76 (`abs.w`) ≈ 156 cycles.
+  76 + 76 = **152 cycles** (mesuré, source `(An)`).

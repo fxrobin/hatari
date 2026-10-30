@@ -86,9 +86,13 @@ efface aussi le bit en attente.
           movem.l (sp)+,d0-d7
           rte                           ; EOI automatique supposé
   ```
-  Le changement arrive en bordure droite/gauche de la ligne suivante : à
-  l'écran, la nouvelle palette commence à la ligne 193 (marge de quelques
-  dizaines de cycles pour une palette complète).
+  **Mesuré** (`bench/hwtest.s`, H7) : dans le handler, le compteur vidéo
+  vaut exactement base + 192 × 160 → les lignes 0–191 sont finies, la ligne
+  192 (comptée depuis 0) n'a pas commencé. Budget avant son premier pixel :
+  512 − 400 + 56 = 168 cycles, moins 56 d'interruption ≈ 112 cycles ; une
+  palette complète (152 cycles + sauvegarde) déborde sur le début de la
+  ligne 192 → ne changer d'abord que les couleurs visibles en bord gauche,
+  ou déclencher une ligne plus tôt.
 - Recharger `TBDR` dans la VBL (le compteur se recharge seul à chaque
   passage à 0 avec la valeur du registre de données).
 - Pour plusieurs rasters : `TBDR` = 1 et une table de couleurs indexée dans

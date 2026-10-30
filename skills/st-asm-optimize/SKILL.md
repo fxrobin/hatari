@@ -82,8 +82,10 @@ la même scène. Coûts de référence : `st-hardware/references/cpu-timing.md`.
 
 ## 4. Prouver le gain
 
-- Banc Hatari : `NF_CYCLES` avant/après la routine (skill `st-dev-loop` §5),
-  plusieurs appels, min/moyenne/max ; même entrée à chaque essai.
+- Banc Hatari : `skills/st-dev-loop/bench/cycbench.s` (ajouter un test
+  `T "nom",label` = 64 copies déroulées, résultat en cycles par copie au
+  centième). La routine mesurée ne doit pas dépendre de registres que
+  le banc utilise : il garde son état en mémoire et remet d0-d7 à 0.
 - Profileur : `profile on` … `profile cycles` donne les adresses les plus
   coûteuses ; `profile loops` détecte les boucles.
 - Bande de couleur en bordure : visible à l'œil, utile en démo/jeu sur
@@ -97,6 +99,10 @@ la même scène. Coûts de référence : `st-hardware/references/cpu-timing.md`.
   données et pointeurs (`even`).
 - `movem` vers la mémoire écrit les registres dans l'ordre inverse en
   `-(An)` ; en lecture `(An)+` étend le signe des `.w` dans les registres.
+- **`bra.s` vers l'instruction suivante est impossible** : un déplacement
+  8 bits nul signifie « déplacement 16 bits dans le mot suivant » ; GNU as
+  l'émet sans erreur et le CPU saute n'importe où (vu en écrivant le banc).
+  Utiliser `bra.w`, ou supprimer le branchement.
 - `dbra` teste sur **16 bits** : `d7` = −1 ou 65535 tours si mal initialisé.
 - L'assembleur peut optimiser derrière votre dos (vasm : `-no-opt` ou
   options `-opt-*`) : vérifier au désassemblage pour du code à timing exact.

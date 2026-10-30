@@ -74,6 +74,10 @@ Opérations (`OP`, S = source après HOP/skew, D = destination) :
 HOP = 0, OP = 0, destination = coin, incX dest = 2, xcount = 4k,
 incY dest = 160 − (4k−1)×2, ycount = n, masques `$FFFF`.
 
+Vérifié sous Hatari STE (`bench/hwtest.s`, H5) : zone 32 px × 4 lignes
+effacée, voisinage intact, `ycount` relu à 0 après le blit, boucle
+`bset #7` / `bne` terminée.
+
 **Effacer un seul plan** (ex. plan 2 de tout l'écran) : incX dest = 8,
 xcount = 20, incY dest = 8, ycount = 200, OP = 0.
 

@@ -10,19 +10,39 @@ secondes, sans interface graphique, et prouver le timing par des chiffres.
 
 ## 1. Assembleur
 
-| Outil | Commande type | Remarque |
-|---|---|---|
-| **vasm** (`vasmm68k_mot`) | `vasmm68k_mot -Ftos -devpac -nosym -o prog.prg prog.s` | syntaxe Devpac, le plus courant aujourd'hui ; `-m68000` par défaut ; `-opt-*` désactive des optimisations si on veut un timing exact |
-| rmac (Reboot) | `rmac -fb -p prog.s` | utilisé par la scène actuelle, macros Devpac |
-| AHCC | projet `.prj` | ce qu'utilisent les tests de Hatari (`tests/readme.txt`) |
-| gcc m68k-atari-mint | `m68k-atari-mint-gcc -m68000 -O2` | pour le C, inline asm pour le chaud |
+**Chaîne validée** (2026-10-30) : image Docker **`fxrobin/m68k-compiler`**
+(dépôt `fxrobin/docker-m68k-compiler`, chaîne `m68k-atari-mint` de Vincent
+Rivière : GNU as 2.30 MiNT, ld, gcc 4.6.4, objdump). Le script
+`bench/build.sh nom` assemble `nom.s` en `nom.prg` :
 
-- **Pas d'optimisation implicite** quand on compte les cycles : vasm
-  transforme par défaut certains `move.l #0` en `moveq`, `bra` en `bra.s`…
-  Vérifier au désassemblage (`disassemble`) ce qui a été émis.
-- Adresses matérielles en **absolu court** : `$FFFF8240.w` ou `$FF8240.w`
-  (le 68000 n'a que 24 bits d'adresse ; `$FFFF8240` en `.w` = 4 cycles de moins
-  qu'en `.l`).
+```sh
+docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/app" -w /app fxrobin/m68k-compiler sh -c \
+  "m68k-atari-mint-as --register-prefix-optional -m68000 -o x.o x.s && m68k-atari-mint-ld -s -o x.prg x.o"
+```
+
+(`dockerd` doit tourner ; dans une session cloud, le lancer à la main.)
+Désassembler pour vérifier ce qui a été émis :
+`m68k-atari-mint-objdump -d x.o`.
+
+Syntaxe GNU as (avec `--register-prefix-optional`), différences avec Devpac :
+
+| Devpac / vasm | GNU as |
+|---|---|
+| `$FF8240`, `%1010` | `0xff8240`, `0b1010` |
+| `; commentaire` | `\| commentaire` (`;` sépare des instructions) |
+| `.loop` (label local) | `1:` puis `1b` / `1f` |
+| `dc.w`, `dc.b "x",0`, `ds.l`, `even` | `.dc.w`, `.asciz "x"`, `.ds.l`, `.even` |
+| `rept n` / `endr`, `macro` | `.rept n` / `.endr`, `.macro nom args` / `.endm` (`\arg`) |
+| `section bss` | `.bss` ; sous-sections `.data 0`, `.data 1` |
+| `$ffff8240.w` | `0xffff8240.w` (absolu court, accepté tel quel) |
+
+Autres assembleurs courants : **vasm** (`vasmm68k_mot -Ftos -devpac`,
+syntaxe Devpac, optimise par défaut : `-no-opt` pour un timing exact),
+**rmac**, **AHCC** (utilisé par les tests de Hatari). Quel que soit l'outil,
+vérifier au désassemblage le code d'une routine à timing exact.
+
+- Adresses matérielles en **absolu court** : `0xffff8240.w` (le 68000 n'a
+  que 24 bits d'adresse ; 4 cycles de moins qu'en absolu long).
 
 ## 2. Squelette de programme (à respecter)
 
@@ -53,7 +73,9 @@ Lire `$FF820A` : bit 1 = 50 Hz. Les écrans ST/STE en basse résolution sont à
 
 ## 3. Lancer sans interface (CLI Hatari)
 
-Construire Hatari : voir `CLAUDE.md` (`build/src/hatari`). Puis :
+Construire Hatari : voir `CLAUDE.md` (`build/src/hatari`) ; il faut
+`libsdl2-dev` (+ `zlib1g-dev`, `libpng-dev`), sinon CMake s'arrête sur
+« SDL library not found ». Puis (c'est ce que fait `bench/run.sh nom [st|ste]`) :
 
 ```sh
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
@@ -145,14 +167,40 @@ NF mesuré à vide. Détecter NatFeats en déroutant le vecteur illégal `$10`
   boucle sur l'octet bas du compteur vidéo puis `lsl.w d0,d0` (patron de
   `tests/cycles/cyccheck.s` et des routines overscan).
 
-## 7. Tests de non-régression
+## 7. Banc de test fourni (`bench/`)
+
+Vérifié le 2026-10-30 avec la chaîne ci-dessus et Hatari compilé depuis ce
+dépôt :
+
+| Fichier | Rôle |
+|---|---|
+| `nf.inc` | NatFeats : `nf_init`, `puts` (a0), `putdec` (d0.l), `puthex` (d0.w), `cycles` (→ d0), `nf_exit` (d0) |
+| `cycbench.s` | coût en cycles de séquences (64 copies déroulées, IRQ masquées, coût de mesure soustrait) ; ajouter un test = une macro `T "nom",label` + la routine |
+| `hwtest.s` | contrôles matériels STE (H1–H8) : `$FF820D`, palette `.b`, bus error joypad, Microwire, blitter, DMA son, Timer B, hscroll + linewidth |
+| `build.sh`, `run.sh` | assembler (Docker) / lancer sous Hatari sans écran |
+
+```sh
+cd skills/st-dev-loop/bench
+./build.sh cycbench && ./run.sh cycbench ste     # puis: ./run.sh cycbench st
+./build.sh hwtest   && ./run.sh hwtest ste
+```
+
+Résultats de référence : `st-hardware/references/cpu-timing.md` (cycles) et
+les mentions « vérifié (H*n*) » des autres références. Un écart après une
+mise à jour de Hatari = régression de l'émulateur ou du banc : à creuser.
+
+Piège rencontré : une routine mesurée qui écrase les registres du banc fausse
+la mesure (`movem.l (a0),d0-d7` avait donné 535 cycles au lieu de 76) ; le
+banc garde donc son état en mémoire.
+
+## 8. Tests de non-régression
 
 Calquer `tests/cycles/run_test.sh` : le PRG écrit un fichier résultat via
 GEMDOS (ou `NF_STDERR`), le script compare à un `test_out.txt` attendu ;
 enregistrer dans CTest. Un test par effet sensible au timing (bordures,
 raster, scroll matériel), comparé par capture (`tests/screen`).
 
-## 8. Différences machine à tester
+## 9. Différences machine à tester
 
 - ST vs STE : `$FF8205/07/09` en écriture, `$FF820D/0F/65`, palette 4 bits,
   blitter, DMA son, joypads `$FF9200/02` n'existent que sur STE (bus error
