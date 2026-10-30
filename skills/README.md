@@ -51,7 +51,9 @@ liens symboliques pour que Claude Code les découvre.
 - **Vérification** : le banc `st-dev-loop/bench/` (GNU as via l'image Docker
   `fxrobin/m68k-compiler`, Hatari compilé depuis ce dépôt) a mesuré le
   tableau de cycles et validé les recettes STE marquées « vérifié » dans
-  `st-hardware/references/`. Restent non exécutés : les extraits marqués
-  *(déduit)*, le handler ACIA et le sprite blitter multi-passes. Programmes de
+  `st-hardware/references/`. Vérifiés aussi : le sprite blitter 8 passes
+  (`blitspr.s`, exact au pixel) et le handler ACIA (`acia.s` piloté par
+  `acia_harness.c` via le cœur libretro). Restent non exécutés : les extraits
+  marqués *(déduit)*. Programmes de
   référence de la CI Hatari : `tests/screen/flixfull.s` (overscan, MFP,
   IKBD) et `tests/cycles/cyccheck.s`.

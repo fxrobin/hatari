@@ -88,9 +88,15 @@ xcount = 20, incY dest = 8, ycount = 200, OP = 0.
    FXSR/NFSR selon le décalage, masques de bord = bords du sprite.
 2. Plans : source = données du sprite (plan par plan), OP = 7 (S∨D),
    4 passes.
-Coût ≈ 8 passes de (lecture S + lecture D + écriture D) : rentable à partir de
-~32×32 px ; en dessous, un sprite pré-décalé au CPU est souvent aussi rapide
-(pas de surcoût de réglage des registres).
+Coût ≈ 8 passes de (lecture S + lecture D + écriture D).
+**Vérifié au pixel** sous Hatari STE (`bench/blitspr.s` + `blitspr_check.py`,
+x = 37, 48, 5, 300) avec cette mise en œuvre : source large d'un mot de plus
+que le sprite (2e mot à 0, masque `$FFFF`) pour absorber le décalage,
+FXSR = NFSR = 0, xcount = 2, `endmask1 = $FFFF >> skew`,
+`endmask3 = ~endmask1` (0 si skew = 0 : le 2e mot n'est pas touché),
+HOP = 2, mode HOG. Mesuré : **~4 730 cycles** pour un 16×16 (mesure NatFeats
+comprise), soit ~3 % d'une VBL ; à cette taille, un sprite CPU pré-décalé
+est du même ordre : le blitter devient intéressant pour les gros sprites.
 
 **Remplir le playfield depuis des tuiles** : une passe par tuile (xcount = 4,
 ycount = 16, incX = 2, incY = 160−6) ; regrouper les tuiles contiguës d'une

@@ -81,9 +81,21 @@ acia_irq:
         bclr    #6,$fffffa11.w          ; EOI si MFP en mode logiciel (sans effet en auto)
         rte
 ```
-Ce squelette ignore les paquets souris et `$FE` : après `$12`/`$14` il n'en
-arrive plus. Un vrai handler suit une petite machine à états par type de
-paquet.
+**Vérifié** (2026-10-30, `skills/st-dev-loop/bench/acia.s` +
+`acia_harness.c`, cœur libretro du serveur MCP, STE, MFP en EOI logiciel
+`$48`) : joystick 1 haut → `joy1` = `$01`, haut + feu → `$81`, droite →
+`$08`, relâché → `$00`, chaque changement vu ~2 VBL après l'entrée ; espace →
+`$39` puis `$B9` ; 11 interruptions servies (le `bclr` d'EOI est donc
+indispensable dans ce mode).
+
+Limites de ce squelette, vues en test :
+- l'IKBD envoie **`$F1`** après son reset (octet de version) : le handler le
+  range comme une touche → ignorer `$F0–$F5` au démarrage ;
+- les paquets `$FE` (joystick 0, port souris) et les paquets souris ne sont
+  pas gérés : avec `$14`, un joystick branché sur le port 0 enverrait `$FE`
+  + un octet, rangés comme deux « touches ». Un vrai handler suit une petite
+  machine à états par en-tête (`$F6`–`$FF`, avec la longueur de chaque
+  paquet).
 
 ## Joypads STE (`src/joy.c:400-569`, `src/ioMemTabSTE.c:206-209`)
 
