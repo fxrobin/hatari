@@ -1,0 +1,1 @@
+../../skills/agents/st-game-analyst.md

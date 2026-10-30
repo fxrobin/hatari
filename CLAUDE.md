@@ -99,3 +99,10 @@ Serveur MCP stdio Java (`hatari-mcp/`, JDK 25, FFM) qui charge `build/src/libret
 (recette de boot, carte mémoire, formats tilemap/tuiles/fond/sprites, adresses des
 routines, méthode). **Mettre ce fichier à jour à chaque nouvelle trouvaille stable**
 (adresse, format, routine, comportement confirmé), pas les hypothèses en cours.
+
+## Skills Atari ST/STE (`skills/`)
+
+Skills et agents pour programmer le ST/STE en 68000 (matériel sourcé dans `src/`,
+patrons de jeu tirés de Xenon 2, boucle de dev sous Hatari) : voir `skills/README.md`.
+Liens symboliques dans `.claude/skills/` et `.claude/agents/`. Tout fait matériel
+ajouté à `skills/st-hardware/references/` cite sa source (`src/fichier.c:ligne` ou mesure).
