@@ -6,6 +6,8 @@ set -e
 dir=$(cd "$(dirname "$0")" && pwd)
 hatari=${HATARI:-$dir/../../../build/src/hatari}
 cd "$dir"
-SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy HOME="$dir" \
+home=$(mktemp -d)		# Hatari writes its config/nvram under $HOME
+trap 'rm -rf "$home"' EXIT
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy HOME="$home" \
 	"$hatari" --machine "${2:-ste}" --tos none --natfeats on --fast-forward on \
 	--sound off --log-level error --run-vbls 3000 "$1.prg" 2>&1 | grep -v '^$'
