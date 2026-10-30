@@ -1,0 +1,1 @@
+../../skills/agents/ste-hardware-verifier.md
